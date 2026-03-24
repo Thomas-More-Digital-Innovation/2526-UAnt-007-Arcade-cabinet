@@ -212,6 +212,13 @@
         system.stateVersion = "25.11";
         users.mutableUsers = false;
 
+        # Set keyboard layout to Belgian
+        i18n.defaultLocale = "en_US.UTF-8";
+        console.keyMap = "be-latin1";
+        services.xserver.xkb = {
+          layout = "be";
+        };
+
         services.openssh = {
           enable = true;
           settings = {
