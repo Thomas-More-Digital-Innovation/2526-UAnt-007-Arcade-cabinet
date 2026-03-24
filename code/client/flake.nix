@@ -218,12 +218,6 @@
           };
         };
 
-        users.users.nixos = {
-          isNormalUser = true;
-          extraGroups = [ "wheel" ];
-          hashedPassword = "$6$1S4IKvCOc1FqhMig$ohQsKqzkDuES5DBMgYzzBE3OX53miz0T3MHzmIXlvhIrGxM2rAwHq0OEeJfe5FPB973jott3bC7U3u5E6LmOc.";
-        };
-
         users.users.pi = {
           isNormalUser = true;
           extraGroups = [ "wheel" ];
