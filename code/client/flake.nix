@@ -399,19 +399,31 @@
     installerImages = let
       nixos = self.nixosConfigurations;
       mkImage = nixosConfig: nixosConfig.config.system.build.sdImage;
+      mkUncompressed = nixosConfig: (nixosConfig.extendModules {
+        modules = [ { sdImage.compressImage = false; } ];
+      }).config.system.build.sdImage;
     in {
       rpi02 = mkImage nixos.rpi02-installer;
+      rpi02-uncompressed = mkUncompressed nixos.rpi02-installer;
       rpi3 = mkImage nixos.rpi3-installer;
+      rpi3-uncompressed = mkUncompressed nixos.rpi3-installer;
       rpi4 = mkImage nixos.rpi4-installer;
+      rpi4-uncompressed = mkUncompressed nixos.rpi4-installer;
       rpi5 = mkImage nixos.rpi5-installer;
+      rpi5-uncompressed = mkUncompressed nixos.rpi5-installer;
     };
 
     sdImages = let
       nixos = self.nixosConfigurations;
       mkImage = nixosConfig: nixosConfig.config.system.build.sdImage;
+      mkUncompressed = nixosConfig: (nixosConfig.extendModules {
+        modules = [ { sdImage.compressImage = false; } ];
+      }).config.system.build.sdImage;
     in {
       rpi5 = mkImage nixos.rpi5;
+      rpi5-uncompressed = mkUncompressed nixos.rpi5;
       rpi5-immutable = mkImage nixos.rpi5-immutable;
+      rpi5-immutable-uncompressed = mkUncompressed nixos.rpi5-immutable;
     };
 
   };

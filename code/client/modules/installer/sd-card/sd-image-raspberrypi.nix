@@ -25,9 +25,10 @@
   boot.loader.raspberry-pi.bootloader = lib.mkIf
     (config.boot.loader.raspberry-pi.variant == "5") "kernel";
 
+  sdImage.compressImage = lib.mkDefault true;
   image.baseName = let
     cfg = config.boot.loader.raspberry-pi;
-  in "nixos-image-rpi${cfg.variant}-${cfg.bootloader}";
+  in "nixos-image-rpi${cfg.variant}-${cfg.bootloader}" + (if config.sdImage.compressImage then "" else "-uncompressed");
 
   sdImage = {
     # this needs to be big enough to accomodate all kernels and initrds of previous generations
