@@ -80,6 +80,7 @@
 
       sd-image = import ./modules/installer/sd-card/sd-image-raspberrypi.nix;
       immutable = import ./modules/immutable.nix;
+      docker = import ./modules/docker.nix;
 
       pisugar-3 = import ./modules/pisugar-3.nix;
 
@@ -206,6 +207,7 @@
       };
 
       custom-user-config = ({ config, pkgs, lib, nixos-raspberrypi, ... }: {
+        imports = [ nixos-raspberrypi.nixosModules.docker ];
 
         system.stateVersion = "25.11";
         users.mutableUsers = false;
@@ -220,7 +222,7 @@
 
         users.users.pi = {
           isNormalUser = true;
-          extraGroups = [ "wheel" ];
+          extraGroups = [ "wheel" "docker" ];
           hashedPassword = "$6$8HEfeFVwfLMMhpY.$e8ZgUExdBzdyi/zZW2Y10M0XdKAuEZ6anx3TNBJz3SyKDt.p7HuxRFWOf.X4yO/ubZ29I2M.Y0n3MUfgOebNR.";
         };
 
