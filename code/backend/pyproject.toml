@@ -1,0 +1,18 @@
+[project]
+name = "backend"
+description = "Backend for the management site of the arcade cabinet"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [
+    { name = "David Maat", email = "r1036789@student.thomasmore.be" },
+    { name = "Stijn Rombouts", email = "r1036855@student.thomasmore.be" }
+]
+dynamic = ["version"]
+dependencies = [
+    "fastapi[standard]",
+]
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
