@@ -2,3 +2,5 @@ build/
 __pycache__/
 backend.egg-info/
 dist/
+.env
+src/uploads/
