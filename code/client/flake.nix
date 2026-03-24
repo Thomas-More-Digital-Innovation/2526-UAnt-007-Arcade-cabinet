@@ -241,7 +241,10 @@
           fastfetch
           ungoogled-chromium
           dnsutils
+          xorg.xset
         ];
+
+        boot.kernelParams = [ "consoleblank=0" ];
 
         system.nixos.tags = let
           cfg = config.boot.loader.raspberry-pi;
@@ -323,7 +326,18 @@
 
             # Chromium autostart for the session.
             services.xserver.displayManager.sessionCommands = ''
+              ${pkgs.xorg.xset}/bin/xset s off
+              ${pkgs.xorg.xset}/bin/xset -dpms
+              ${pkgs.xorg.xset}/bin/xset s noblank
               ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check &
+            '';
+
+            # Disable screensaver and power management in X11
+            services.xserver.serverFlagsSection = ''
+              Option "BlankTime" "0"
+              Option "StandbyTime" "0"
+              Option "SuspendTime" "0"
+              Option "OffTime" "0"
             '';
           })
           custom-user-config
@@ -359,7 +373,18 @@
 
             # Chromium autostart for the session.
             services.xserver.displayManager.sessionCommands = ''
+              ${pkgs.xorg.xset}/bin/xset s off
+              ${pkgs.xorg.xset}/bin/xset -dpms
+              ${pkgs.xorg.xset}/bin/xset s noblank
               ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check &
+            '';
+
+            # Disable screensaver and power management in X11
+            services.xserver.serverFlagsSection = ''
+              Option "BlankTime" "0"
+              Option "StandbyTime" "0"
+              Option "SuspendTime" "0"
+              Option "OffTime" "0"
             '';
           })
           custom-user-config
