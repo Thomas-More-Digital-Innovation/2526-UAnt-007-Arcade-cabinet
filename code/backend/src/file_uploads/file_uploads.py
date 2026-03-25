@@ -1,21 +1,18 @@
-import os, dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from config import config
+import os, logging
 
-dotenv.load_dotenv()
+logger = logging.getLogger(__name__)
 
-app = FastAPI()
+router = APIRouter()
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@app.post("/upload")
+@router.post("/upload")
 def upload(file: UploadFile = File(...)):
-    uploads_dir = os.path.join(os.path.dirname(__file__), config.uploads_directory)
+    uploads_dir = config.uploads_directory
     os.makedirs(uploads_dir, exist_ok=True)
     file_path = os.path.join(uploads_dir, file.filename)
     try:
+        logger.info(f"Saving file to {file_path}")
         with open(file_path, 'wb') as f:
             while contents := file.file.read(1024 * 1024):
                 f.write(contents)
@@ -26,8 +23,9 @@ def upload(file: UploadFile = File(...)):
 
     return {"message": f"Successfully uploaded {file.filename}"}
 
-@app.get("/files")
+@router.get("/list")
 def list_files():
+    logger.info("Listing uploaded files")
     uploads_dir = os.path.join(os.path.dirname(__file__), config.uploads_directory)
     if not os.path.exists(uploads_dir):
         return {"files": []}
