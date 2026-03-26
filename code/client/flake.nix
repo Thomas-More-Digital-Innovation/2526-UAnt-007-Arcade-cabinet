@@ -229,7 +229,7 @@
 
         users.users.pi = {
           isNormalUser = true;
-          extraGroups = [ "wheel" "docker" ];
+          extraGroups = [ "wheel" "docker" "input" "video" "plugdev" ];
           hashedPassword = "$6$8HEfeFVwfLMMhpY.$e8ZgUExdBzdyi/zZW2Y10M0XdKAuEZ6anx3TNBJz3SyKDt.p7HuxRFWOf.X4yO/ubZ29I2M.Y0n3MUfgOebNR.";
         };
 
@@ -245,7 +245,11 @@
           ungoogled-chromium
           dnsutils
           xorg.xset
+          input-remapper
+          evtest
         ];
+
+        services.input-remapper.enable = true;
 
         boot.kernelParams = [ "consoleblank=0" ];
 
@@ -332,7 +336,7 @@
               ${pkgs.xorg.xset}/bin/xset s off
               ${pkgs.xorg.xset}/bin/xset -dpms
               ${pkgs.xorg.xset}/bin/xset s noblank
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check &
+              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check "https://www.ratatype.com/keyboard-test/" &
             '';
 
             # Disable screensaver and power management in X11
@@ -379,7 +383,7 @@
               ${pkgs.xorg.xset}/bin/xset s off
               ${pkgs.xorg.xset}/bin/xset -dpms
               ${pkgs.xorg.xset}/bin/xset s noblank
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check &
+              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check "https://www.ratatype.com/keyboard-test/" &
             '';
 
             # Disable screensaver and power management in X11
