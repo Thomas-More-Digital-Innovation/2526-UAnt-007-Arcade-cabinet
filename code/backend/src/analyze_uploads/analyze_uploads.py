@@ -14,7 +14,7 @@ def analyze_zip_uploads():
     found_media = []
 
     for filename in get_uploaded_files():
-        uploaded_path = os.path.join(config.uploads_directory, filename)
+        uploaded_path = os.path.join(config.uploads_directory, 'uploaded_zips', filename)
         unzip_path = os.path.normpath(os.path.join(config.uploads_directory, 'extracted_games', filename))
 
         print(f"Unzipping {uploaded_path} to {unzip_path}")
@@ -59,7 +59,7 @@ def get_uploaded_files():
     # This function should return a list of uploaded filenames (no directory path)
     
     uploaded_files = []
-    for filepath in glob.iglob(config.uploads_directory + '/*', recursive=True):
+    for filepath in glob.iglob(config.uploads_directory + '/uploaded_zips/*', recursive=True):
         filename = os.path.basename(filepath)
         print(filename)
         uploaded_files.append(filename)

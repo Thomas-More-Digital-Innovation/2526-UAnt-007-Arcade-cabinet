@@ -14,10 +14,13 @@ from fastapi import FastAPI
 from analyze_uploads.analyze_uploads import router as analyze_uploads_router
 from file_uploads.file_uploads import router as file_uploads_router
 from docker_builder.docker_builder import router as docker_builder_router
+from game.game import router as game_router
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+app.include_router(game_router, prefix="/games")
 
 app.include_router(analyze_uploads_router)
 app.include_router(file_uploads_router, prefix="/file-uploads")
