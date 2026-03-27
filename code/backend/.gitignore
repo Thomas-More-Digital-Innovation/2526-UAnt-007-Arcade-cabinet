@@ -4,3 +4,4 @@ backend.egg-info/
 dist/
 .env
 src/uploads/
+*.db
