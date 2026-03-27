@@ -52,9 +52,6 @@ def analyze_zip_uploads():
     return {'media_files': found_media}
 
 
-
-
-
 def get_uploaded_files():
     # This function should return a list of uploaded filenames (no directory path)
     

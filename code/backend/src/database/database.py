@@ -42,6 +42,6 @@ class Asset(Base):
     original_path: Mapped[str] = mapped_column(String(255))
     path: Mapped[str] = mapped_column(String(255))
     def __repr__(self) -> str:
-        return f"Asset(id={self.id!r}, name={self.name!r})"
+        return f"Asset(id={self.id!r}, gameId={self.gameId!r}, original_path={self.original_path!r})"
     
 Base.metadata.create_all(engine)
