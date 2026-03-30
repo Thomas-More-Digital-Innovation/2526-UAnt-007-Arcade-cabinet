@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import ForeignKey
 from sqlalchemy import String
 from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
@@ -11,7 +12,14 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine, func
 engine = create_engine("sqlite:///database.db", echo=True)
 
-session = Session(engine)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+def get_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 class Base(DeclarativeBase):
     pass
@@ -37,11 +45,11 @@ class ZipUpload(Base):
 class Asset(Base):
     __tablename__ = "asset"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    gameId: Mapped[UUID] = mapped_column(ForeignKey("game.id"))
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("game.id"))
     game: Mapped["Game"] = relationship(back_populates="assets")
     original_path: Mapped[str] = mapped_column(String(255))
     path: Mapped[str] = mapped_column(String(255))
     def __repr__(self) -> str:
-        return f"Asset(id={self.id!r}, gameId={self.gameId!r}, original_path={self.original_path!r})"
+        return f"Asset(id={self.id!r}, game_id={self.game_id!r}, original_path={self.original_path!r})"
     
 Base.metadata.create_all(engine)

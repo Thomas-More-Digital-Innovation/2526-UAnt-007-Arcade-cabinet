@@ -1,15 +1,16 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from config import config
 import os, logging, puremagic, pathlib
 from database import database
 from uuid import UUID, uuid4
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 @router.post("/upload-zip")
-def upload_zip(game_id: UUID, file: UploadFile = File(...)):
+def upload_zip(game_id: UUID, file: UploadFile = File(...), db: Session = Depends(database.get_session)):
     uploads_dir = os.path.join(config.uploads_directory, 'uploaded_zips')
     os.makedirs(uploads_dir, exist_ok=True)
 
@@ -36,8 +37,8 @@ def upload_zip(game_id: UUID, file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail='Only ZIP files are allowed')
 
     zip_upload = database.ZipUpload(name=filename, game_id=game_id)
-    database.session.add(zip_upload)
-    database.session.commit()
+    db.add(zip_upload)
+    db.commit()
 
     return {"message": f"Successfully uploaded {original_name}"}
 
