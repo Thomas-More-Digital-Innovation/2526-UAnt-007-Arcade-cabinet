@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from pydantic import BaseModel
 from fastapi.responses import FileResponse
 import logging
 from database import database
@@ -35,13 +36,46 @@ def _normalize_virtual_path(p: str) -> str:
 def get_all_games(db: Session = Depends(database.get_session)):
     return {"games": db.query(database.Game).all()}
 
+
+# Pydantic model for game creation
+class GameCreateRequest(BaseModel):
+    name: str
+
 @router.post("/")
-def create_game(name: str, db: Session = Depends(database.get_session)):
-    new_game = database.Game(name=name)
+def create_game(request: GameCreateRequest, db: Session = Depends(database.get_session)):
+    new_game = database.Game(name=request.name)
     db.add(new_game)
     db.commit()
-    return {"game_id": new_game.id, "name": new_game.name}
+    return {"game": {"id": new_game.id, "name": new_game.name}}
 
+class GamePutRequest(BaseModel):
+    id: UUID
+    name: str
+
+@router.put("/{game_id}")
+def update_game(game_id: UUID, request: GamePutRequest, db: Session = Depends(database.get_session)):
+    game = db.get(database.Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game.name = request.name
+    db.commit()
+    return {"game": {"id": game.id, "name": game.name}}
+
+@router.delete("/{game_id}")
+def delete_game(game_id: UUID, db: Session = Depends(database.get_session)):
+    game = db.get(database.Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    # Delete associated zip uploads and assets
+    for zip_upload in game.zip_uploads:
+        db.delete(zip_upload)
+    for asset in game.assets:
+        db.delete(asset)
+
+    db.delete(game)
+    db.commit()
+    return {"message": "Game deleted successfully"}
 
 def _get_latest_zip_upload(db: Session, game_id: UUID):
     return (
