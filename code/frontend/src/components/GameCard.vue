@@ -2,7 +2,14 @@
   <q-card>
     <q-card-section class="flex items-center justify-between">
       <div class="text-h6">{{ title }}</div>
-      <q-btn color="primary" icon="science" label="Test" :href="`${api.defaults.baseURL}/games/${props.id}/test`" :target="'_blank'" />
+      <q-btn
+        color="primary"
+        icon="science"
+        label="Test"
+        unelevated
+        :href="`${api.defaults.baseURL}/games/${props.id}/test`"
+        :target="'_blank'"
+      />
     </q-card-section>
     <q-card-section class="flex gap-2 justify-end">
       <q-btn color="primary" icon="edit" unelevated :ripple="false" label="Edit" @click="onEdit" />
@@ -19,7 +26,6 @@
 </template>
 
 <script setup lang="ts">
-
 import { api } from 'boot/axios';
 
 const props = defineProps<{
@@ -36,6 +42,4 @@ function onEdit() {
 function onRemove() {
   emit('delete', props.title);
 }
-
-
 </script>

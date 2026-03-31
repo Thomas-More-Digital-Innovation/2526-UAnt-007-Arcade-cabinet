@@ -32,8 +32,18 @@
           <q-space />
           <q-btn icon="close" unelevated v-close-popup />
         </q-card-section>
-        <q-card-section>
+        <q-card-section class="flex flex-col gap-4">
           <q-input v-model="modalGame.name" type="text" label="Game Name" />
+          <!-- Show uploader only in add mode -->
+          <q-uploader
+            v-if="!isEditMode"
+            ref="uploaderRef"
+            accept=".zip"
+            label="Upload ZIP folder"
+            field-name="file"
+            :auto-upload="false"
+            :hide-upload-btn="true"
+          />
         </q-card-section>
         <q-card-actions align="right">
           <q-btn
@@ -62,12 +72,13 @@ interface Game {
   name: string;
 }
 
-const $q = useQuasar(); 
+const $q = useQuasar();
 
 const data = reactive<Game[]>([]);
 const confirm = ref(false);
 const isEditMode = ref(false);
 const modalGame = reactive<{ id: string | undefined; name: string }>({ id: undefined, name: '' });
+const uploaderRef = ref();
 
 function resetModal() {
   confirm.value = false;
@@ -76,11 +87,24 @@ function resetModal() {
   modalGame.name = '';
 }
 
-function addGame() {
-  api.post('/games', { name: modalGame.name }).then((response) => {
-    const newGame = response.data.game;
-    data.push(newGame);
+async function addGame() {
+  const uploader = uploaderRef.value;
+  if (!uploader || uploader.files.length === 0) {
+    $q.notify({ type: 'negative', message: 'Please select a ZIP file to upload.' });
+    return;
+  }
+  // Step 1: Create the game
+  const gameResp = await api.post('/games', { name: modalGame.name });
+  const newGame = gameResp.data.game;
+  // Step 2: Upload the ZIP file
+  const formData = new FormData();
+  formData.append('file', uploader.files[0]);
+  await api.post(`/file-uploads/upload-zip?game_id=${newGame.id}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
+  data.push(newGame);
+  confirm.value = false;
+  resetModal();
 }
 
 function onEditGame(game: Game) {
@@ -110,7 +134,6 @@ function deleteGame(params: { id: string }) {
       label: 'Delete',
       color: 'negative',
     },
-    
   })
     .onOk(() => {
       api.delete(`/games/${params.id}`).then(() => {
