@@ -11,6 +11,7 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from analyze_uploads.analyze_uploads import router as analyze_uploads_router
 from file_uploads.file_uploads import router as file_uploads_router
 from docker_builder.docker_builder import router as docker_builder_router
@@ -20,6 +21,19 @@ from assets.assets import router as assets_router
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:9000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 app.include_router(game_router, prefix="/games", tags=["games"])
 app.include_router(assets_router, prefix="/assets", tags=["assets"])
