@@ -8,9 +8,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
+from config import config
+import logging
 
 from sqlalchemy import create_engine, func
-engine = create_engine("sqlite:///database.db", echo=True)
+engine = create_engine("sqlite:///database.db", echo=False)
+
+level = getattr(logging, config.db_log_level.upper(), logging.INFO)
+
+logging.getLogger("sqlalchemy.engine").setLevel(level)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
