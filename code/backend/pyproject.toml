@@ -11,6 +11,9 @@ authors = [
 dynamic = ["version"]
 dependencies = [
     "fastapi[standard]",
+    "docker",
+    "puremagic",
+    "sqlalchemy",
 ]
 [project.optional-dependencies]
 dev = [
