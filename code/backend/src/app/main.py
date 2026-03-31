@@ -21,12 +21,12 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-app.include_router(game_router, prefix="/games")
-app.include_router(assets_router, prefix="/assets")
+app.include_router(game_router, prefix="/games", tags=["games"])
+app.include_router(assets_router, prefix="/assets", tags=["assets"])
 
 app.include_router(analyze_uploads_router)
-app.include_router(file_uploads_router, prefix="/file-uploads")
-app.include_router(docker_builder_router, prefix="/docker-builder")
+app.include_router(file_uploads_router, prefix="/file-uploads", tags=["assets"])
+app.include_router(docker_builder_router, prefix="/docker-builder", tags=["docker"])
 
 @app.get("/")
 async def root():
