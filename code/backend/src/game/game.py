@@ -159,6 +159,60 @@ def upload_asset(
     return {"message": f"Asset {normalized_original_path} uploaded successfully", "asset_id": asset.id}
 
 
+@router.get("/{game_id}/analyzed-assets")
+def get_analyzed_assets(game_id: UUID, db: Session = Depends(database.get_session)):
+    game = db.get(database.Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    zip_upload = _get_latest_zip_upload(db, game_id)
+    if not zip_upload:
+        return {"media_files": []}
+
+    extracted_dir = _get_extracted_dir_for_zip(zip_upload)
+    game_root_dir = _find_game_root(extracted_dir)
+    media_files = []
+
+    for root, _, files in os.walk(game_root_dir):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            try:
+                mime = puremagic.from_file(file_path, mime=True)
+            except Exception:
+                mime = None
+
+            if not mime or not (mime.startswith("image/") or mime.startswith("audio/")):
+                continue
+
+            media_files.append(
+                {
+                    "zip_file": zip_upload.name,
+                    "path": os.path.relpath(file_path, game_root_dir).replace("\\", "/"),
+                    "mime": mime,
+                }
+            )
+
+    return {"media_files": media_files}
+
+
+@router.get("/{game_id}/asset-overrides")
+def get_asset_overrides(game_id: UUID, db: Session = Depends(database.get_session)):
+    game = db.get(database.Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    overrides = db.query(database.Asset).filter_by(game_id=game_id).all()
+    return {
+        "overrides": [
+            {
+                "original_path": asset.original_path,
+                "path": asset.path,
+            }
+            for asset in overrides
+        ]
+    }
+
+
 @router.get("/{game_id}/test")
 def load_game_test(game_id: UUID, db: Session = Depends(database.get_session)):
     """
@@ -187,6 +241,67 @@ def load_game_test(game_id: UUID, db: Session = Depends(database.get_session)):
     rel_path = os.path.relpath(index_html_path, game_root_dir)
     # Use the override-aware logic by calling serve_game_file
     return serve_game_file(game_id, rel_path, db)
+
+
+@router.get("/{game_id}/original/{file_path:path}")
+def serve_original_game_file(game_id: UUID, file_path: str, db: Session = Depends(database.get_session)):
+    try:
+        normalized_file_path = _normalize_virtual_path(file_path)
+        if not normalized_file_path:
+            raise HTTPException(status_code=400, detail="Invalid file path")
+
+        game = db.get(database.Game, game_id)
+        if not game:
+            logger.error(f"Game not found: {game_id}")
+            raise HTTPException(status_code=404, detail="Game not found")
+
+        zip_upload = _get_latest_zip_upload(db, game_id)
+        if not zip_upload:
+            logger.error(f"No uploaded ZIP for game: {game_id}")
+            raise HTTPException(status_code=404, detail="No uploaded ZIP for this game")
+
+        extracted_dir = _get_extracted_dir_for_zip(zip_upload)
+        game_root_dir = _find_game_root(extracted_dir)
+
+        candidate = os.path.normpath(os.path.join(game_root_dir, normalized_file_path))
+        abs_root = os.path.abspath(game_root_dir)
+        abs_candidate = os.path.abspath(candidate)
+
+        # Security check: ensure the requested file is within the extracted directory
+        if os.path.commonpath([abs_root, abs_candidate]) != abs_root:
+            logger.error(f"Invalid file path: {normalized_file_path}")
+            raise HTTPException(status_code=400, detail="Invalid file path")
+        if not os.path.exists(abs_candidate) or not os.path.isfile(abs_candidate):
+            logger.error(f"Original file not found: {abs_candidate}")
+            raise HTTPException(status_code=404, detail="Original file not found")
+
+        return FileResponse(abs_candidate)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Exception serving original file {file_path}: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.get("/{game_id}/replacement/{file_path:path}")
+def serve_replacement_game_file(game_id: UUID, file_path: str, db: Session = Depends(database.get_session)):
+    normalized_file_path = _normalize_virtual_path(file_path)
+    if not normalized_file_path:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    game = db.get(database.Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    asset_override = (
+        db.query(database.Asset)
+        .filter_by(game_id=game_id, original_path=normalized_file_path)
+        .first()
+    )
+    if not asset_override or not os.path.exists(asset_override.path):
+        raise HTTPException(status_code=404, detail="Replacement file not found")
+
+    return FileResponse(asset_override.path)
 
 
 @router.get("/{game_id}/{file_path:path}")
