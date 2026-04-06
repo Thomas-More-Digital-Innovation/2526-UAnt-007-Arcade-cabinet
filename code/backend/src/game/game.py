@@ -8,6 +8,7 @@ import glob, zipfile, os, pathlib, shutil, traceback
 from config import config
 from uuid import UUID
 from sqlalchemy.orm import Session
+from game.internet_assets import localize_internet_assets
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ def _get_latest_zip_upload(db: Session, game_id: UUID):
         .first()
     )
 
-def _get_extracted_dir_for_zip(zip_upload):
+def _get_extracted_dir_for_zip(zip_upload, game_id: UUID):
     extracted_root = os.path.join(config.uploads_directory, 'extracted_games', zip_upload.name)
     if not os.path.exists(extracted_root):
         os.makedirs(extracted_root, exist_ok=True)
@@ -94,6 +95,15 @@ def _get_extracted_dir_for_zip(zip_upload):
             raise HTTPException(status_code=500, detail=f"ZIP file not found: {zip_upload.name}")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extracted_root)
+        localization_result = localize_internet_assets(
+            extracted_root,
+            asset_url_prefix=f"/games/{game_id}",
+        )
+        logger.info(
+            "Localized internet assets for %s: %s",
+            zip_upload.name,
+            localization_result,
+        )
     return extracted_root
 
 def _find_game_root(extracted_dir: str) -> str:
@@ -112,6 +122,19 @@ def _find_game_root(extracted_dir: str) -> str:
     
     # If no HTML files are found, default to the extracted_dir itself, though this case should be handled by HTTPException earlier
     return extracted_dir
+
+
+def _resolve_candidate_path(extracted_dir: str, game_root_dir: str, normalized_file_path: str):
+    # Downloaded external assets are stored at extracted_root/_downloaded_assets.
+    if normalized_file_path.startswith("_downloaded_assets/"):
+        base_dir = extracted_dir
+    else:
+        base_dir = game_root_dir
+
+    candidate = os.path.normpath(os.path.join(base_dir, normalized_file_path))
+    abs_base = os.path.abspath(base_dir)
+    abs_candidate = os.path.abspath(candidate)
+    return abs_base, abs_candidate
 
 @router.post("/{game_id}/upload-asset")
 def upload_asset(
@@ -169,7 +192,7 @@ def get_analyzed_assets(game_id: UUID, db: Session = Depends(database.get_sessio
     if not zip_upload:
         return {"media_files": []}
 
-    extracted_dir = _get_extracted_dir_for_zip(zip_upload)
+    extracted_dir = _get_extracted_dir_for_zip(zip_upload, game_id)
     game_root_dir = _find_game_root(extracted_dir)
     media_files = []
 
@@ -227,7 +250,7 @@ def load_game_test(game_id: UUID, db: Session = Depends(database.get_session)):
     if not zip_upload:
         raise HTTPException(status_code=404, detail="No uploaded ZIP for this game")
 
-    extracted_dir = _get_extracted_dir_for_zip(zip_upload)
+    extracted_dir = _get_extracted_dir_for_zip(zip_upload, game_id)
     game_root_dir = _find_game_root(extracted_dir)
 
     index_html_path = os.path.join(game_root_dir, "index.html")
@@ -260,12 +283,10 @@ def serve_original_game_file(game_id: UUID, file_path: str, db: Session = Depend
             logger.error(f"No uploaded ZIP for game: {game_id}")
             raise HTTPException(status_code=404, detail="No uploaded ZIP for this game")
 
-        extracted_dir = _get_extracted_dir_for_zip(zip_upload)
+        extracted_dir = _get_extracted_dir_for_zip(zip_upload, game_id)
         game_root_dir = _find_game_root(extracted_dir)
 
-        candidate = os.path.normpath(os.path.join(game_root_dir, normalized_file_path))
-        abs_root = os.path.abspath(game_root_dir)
-        abs_candidate = os.path.abspath(candidate)
+        abs_root, abs_candidate = _resolve_candidate_path(extracted_dir, game_root_dir, normalized_file_path)
 
         # Security check: ensure the requested file is within the extracted directory
         if os.path.commonpath([abs_root, abs_candidate]) != abs_root:
@@ -321,12 +342,10 @@ def serve_game_file(game_id: UUID, file_path: str, db: Session = Depends(databas
             logger.error(f"No uploaded ZIP for game: {game_id}")
             raise HTTPException(status_code=404, detail="No uploaded ZIP for this game")
 
-        extracted_dir = _get_extracted_dir_for_zip(zip_upload)
+        extracted_dir = _get_extracted_dir_for_zip(zip_upload, game_id)
         game_root_dir = _find_game_root(extracted_dir)
 
-        candidate = os.path.normpath(os.path.join(game_root_dir, normalized_file_path))
-        abs_root = os.path.abspath(game_root_dir)
-        abs_candidate = os.path.abspath(candidate)
+        abs_root, abs_candidate = _resolve_candidate_path(extracted_dir, game_root_dir, normalized_file_path)
 
         # Check for asset override
         asset_override = (

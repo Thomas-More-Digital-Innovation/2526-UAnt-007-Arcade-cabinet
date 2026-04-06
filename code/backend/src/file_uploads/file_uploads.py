@@ -1,9 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from config import config
-import os, logging, puremagic, pathlib
+import os, logging, puremagic, pathlib, zipfile
+import shutil
 from database import database
 from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
+from game.internet_assets import localize_internet_assets
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,29 @@ def upload_zip(game_id: UUID, file: UploadFile = File(...), db: Session = Depend
     if mime_type != 'application/zip':
         pathlib.Path(file_path).unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail='Only ZIP files are allowed')
+
+    extracted_root = os.path.join(config.uploads_directory, 'extracted_games', filename)
+    os.makedirs(extracted_root, exist_ok=True)
+
+    try:
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            zip_ref.extractall(extracted_root)
+
+        localization_result = localize_internet_assets(
+            extracted_root,
+            asset_url_prefix=f"/games/{game_id}",
+        )
+        logger.info(
+            "Localized internet assets for %s: %s",
+            filename,
+            localization_result,
+        )
+    except Exception as e:
+        logger.exception(e)
+        pathlib.Path(file_path).unlink(missing_ok=True)
+        if os.path.isdir(extracted_root):
+            shutil.rmtree(extracted_root, ignore_errors=True)
+        raise HTTPException(status_code=400, detail='ZIP extraction/localization failed')
 
     zip_upload = database.ZipUpload(name=filename, game_id=game_id)
     db.add(zip_upload)
