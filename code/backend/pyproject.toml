@@ -15,6 +15,7 @@ dependencies = [
     "puremagic",
     "s3fs",
     "sqlalchemy",
+    "httpx",
 ]
 [project.optional-dependencies]
 dev = [

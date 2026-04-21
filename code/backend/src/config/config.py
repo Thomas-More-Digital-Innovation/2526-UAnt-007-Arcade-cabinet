@@ -11,3 +11,6 @@ s3_session_token = os.getenv('S3_SESSION_TOKEN', '')
 
 log_level = os.getenv('LOG_LEVEL', 'ERROR').upper()
 db_log_level = os.getenv('DB_LOG_LEVEL', 'ERROR').upper()
+
+github_repo_url = os.getenv('GITHUB_REPO_URL', '')
+github_token = os.getenv('GITHUB_TOKEN', '')
