@@ -1,13 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from config import config 
 
-import httpx
+import httpx, logging
 
-
-
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
 
 from sqlalchemy.orm import Session
 from database import database
