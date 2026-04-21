@@ -9,3 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Triggered externally"
+      - name: Dump all event payload params
+        run: |
+          echo "Event payload:"
+          echo "-----------------"
+          echo "$PAYLOAD"
+        env:
+          PAYLOAD: ${{ toJson(github.event.client_payload) }}
