@@ -1,6 +1,14 @@
 <template>
   <q-page class="container mx-auto px-5 md:px-0">
-    <div class="flex justify-end mt-10">
+    <div class="flex justify-between mt-10">
+      <q-btn
+        unelevated
+        icon="rocket_launch"
+        color="primary"
+        label="Update Pi"
+        :ripple="false"
+        @click="updatePi"
+      />
       <q-btn
         color="green"
         icon="add"
@@ -341,6 +349,12 @@ function deleteGame(params: { id: string }) {
 function loadData() {
   api.get('/games').then((response) => {
     data.splice(0, data.length, ...response.data.games);
+  });
+}
+
+function updatePi() {
+  api.post('/trigger-build/trigger-workflow').then(() => {
+    $q.notify({ type: 'positive', message: 'Pi update triggered.' });
   });
 }
 
