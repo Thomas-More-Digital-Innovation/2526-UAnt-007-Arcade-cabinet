@@ -153,171 +153,32 @@ class StaticBuildOrchestrator:
                 self.fs.get(s3_path, str(target_path))
 
     def generate_selection_screen(self):
-        """Generates the main index.html for the selection screen."""
-        games = self.payload.get('games', [])
+        """Generates the main index.html for the selection screen using the home-screen template."""
+        logger.info("Generating selection screen from template...")
         
-        # Build the HTML
-        html_template = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arcade Cabinet</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-color: #050b18;
-            --card-bg: rgba(255, 255, 255, 0.05);
-            --accent-color: #4f46e5;
-            --text-color: #f8fafc;
-            --glass-border: rgba(255, 255, 255, 0.1);
-        }
+        # Copy home-screen assets to dist
+        src_home = _current_dir / 'src' / 'home-screen'
+        
+        # Helper to copy directories
+        def copy_dir(src, dst):
+            if src.exists():
+                logger.info(f"  Copying {src.name} to {dst.name}")
+                if dst.exists():
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Outfit', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            background-image: 
-                radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 40%);
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 4rem 2rem;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 4rem;
-            animation: fadeInDown 1s ease-out;
-        }
-
-        h1 {
-            font-size: 3.5rem;
-            margin: 0;
-            text-transform: uppercase;
-            letter-spacing: 0.2rem;
-            background: linear-gradient(to right, #818cf8, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 700;
-        }
-
-        .subtitle {
-            color: #94a3b8;
-            font-size: 1.1rem;
-            margin-top: 0.5rem;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 2rem;
-        }
-
-        .game-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 1.5rem;
-            padding: 2.5rem;
-            text-decoration: none;
-            color: inherit;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            aspect-ratio: 1 / 1;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.6s forwards;
-        }
-
-        .game-card:hover {
-            transform: translateY(-10px) scale(1.02);
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(129, 140, 248, 0.5);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .game-card h2 {
-            margin: 0;
-            font-size: 1.75rem;
-            font-weight: 600;
-            text-align: center;
-            letter-spacing: 0.05rem;
-        }
-
-        .btn-play {
-            margin-top: 1.5rem;
-            padding: 0.75rem 2rem;
-            background: var(--accent-color);
-            border: none;
-            border-radius: 9999px;
-            color: white;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.875rem;
-            letter-spacing: 0.1rem;
-            transition: all 0.3s ease;
-        }
-
-        .game-card:hover .btn-play {
-            background: #6366f1;
-            box-shadow: 0 0 20px rgba(79, 70, 229, 0.4);
-        }
-
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes fadeInUp {
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Staggered animation for cards */
-        .game-card:nth-child(1) { animation-delay: 0.1s; }
-        .game-card:nth-child(2) { animation-delay: 0.2s; }
-        .game-card:nth-child(3) { animation-delay: 0.3s; }
-        .game-card:nth-child(4) { animation-delay: 0.4s; }
-        .game-card:nth-child(5) { animation-delay: 0.5s; }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-color); }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #334155; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Select Game</h1>
-            <div class="subtitle">Experience the classic arcade legends</div>
-        </header>
-        <div class="grid">
-            {cards_html}
-        </div>
-    </div>
-</body>
-</html>
-"""
-        card_template = """
-            <a href="games/{game_id}/{index_rel}" class="game-card">
-                <h2>{name}</h2>
-                <button class="btn-play">Play Now</button>
-            </a>
-"""
-        cards_html = ""
+        copy_dir(src_home / 'css', self.dist_dir / 'css')
+        copy_dir(src_home / 'js', self.dist_dir / 'js')
+        copy_dir(src_home / 'fonts', self.dist_dir / 'fonts')
+        
+        # Copy background
+        bg_src = src_home / 'background.jpg'
+        if bg_src.exists():
+            shutil.copy(bg_src, self.dist_dir / 'background.jpg')
+        
+        # Prepare game data for injection
+        game_metadata = []
+        games = self.payload.get('games', [])
         for game in games:
             game_id = game['id']
             name = game['name']
@@ -327,12 +188,29 @@ class StaticBuildOrchestrator:
             
             if index_path:
                 index_rel = index_path.relative_to(local_game_dir).as_posix()
-                cards_html += card_template.format(game_id=game_id, name=name, index_rel=index_rel)
+                game_metadata.append({
+                    "id": game_id,
+                    "name": name,
+                    "index_rel": index_rel
+                })
             else:
                 logger.warning(f"Could not find index.html for game {name} ({game_id})")
 
+        # Load template
+        template_path = src_home / 'html' / 'home-screen.html'
+        if not template_path.exists():
+            logger.error(f"Home screen template not found at {template_path}")
+            return
+
+        with open(template_path, 'r') as f:
+            template_content = f.read()
+
+        # Inject JSON and save
+        games_json = json.dumps(game_metadata, indent=2)
+        final_html = template_content.replace('{{GAMES_JSON}}', games_json)
+        
         with open(self.dist_dir / 'index.html', 'w') as f:
-            f.write(html_template.replace('{cards_html}', cards_html))
+            f.write(final_html)
 
     def build(self):
         """Main orchestrator function."""
@@ -394,7 +272,7 @@ class StaticBuildOrchestrator:
             except Exception as e:
                 logger.error(f"Failed to process game {game_name}: {e}")
 
-        # Generate the main selection screen
+        # Generate the main selection screen from the new template
         self.generate_selection_screen()
         
         logger.info(f"Build complete! Output in {self.dist_dir}/")
