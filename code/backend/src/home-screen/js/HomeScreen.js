@@ -29,8 +29,8 @@ function showHomeScreen() {
         gameOption.className = 'game-option';
         
         const link = document.createElement('a');
-        // Point to games/<id>/<index_rel>
-        link.href = `games/${game.id}/${game.index_rel}`;
+        // Point to the wrapper or fallback to raw index
+        link.href = game.wrapper_url || `games/${game.id}/${game.index_rel}`;
         link.textContent = game.name;
         
         gameOption.appendChild(link);

@@ -17,6 +17,7 @@ dependencies = [
     "sqlalchemy",
     "psycopg2-binary",
     "httpx",
+    "python-dotenv",
 ]
 [project.optional-dependencies]
 dev = [

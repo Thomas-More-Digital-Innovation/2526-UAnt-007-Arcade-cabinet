@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playing: {{GAME_NAME}}</title>
+    <!-- CSS and JS will be linked here relative to the wrapper location -->
+    <link rel="stylesheet" href="../../css/home-screen.css">
+    <link rel="stylesheet" href="../../css/GameWrapper.css">
+</head>
+
+<body>
+    <div id="game-container">
+        <!-- <a href="../../index.html" class="back-btn">ESC: Exit</a> -->
+
+        <!-- Viewport clipping shell -->
+        <div class="game-viewport-shell">
+            <div id="game-scaler" class="game-scaler">
+                <iframe id="game-iframe" src="{{GAME_INDEX_URL}}" tabindex="0" scrolling="no" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/GameWrapper.js"></script>
+</body>
+
+</html>

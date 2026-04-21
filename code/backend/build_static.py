@@ -188,10 +188,15 @@ class StaticBuildOrchestrator:
             
             if index_path:
                 index_rel = index_path.relative_to(local_game_dir).as_posix()
+                
+                # Create a wrapper for the game to handle scaling
+                self.create_game_wrapper(game_id, name, index_rel)
+                
                 game_metadata.append({
                     "id": game_id,
                     "name": name,
-                    "index_rel": index_rel
+                    "index_rel": index_rel,
+                    "wrapper_url": f"games/{game_id}/game.html"
                 })
             else:
                 logger.warning(f"Could not find index.html for game {name} ({game_id})")
@@ -211,6 +216,25 @@ class StaticBuildOrchestrator:
         
         with open(self.dist_dir / 'index.html', 'w') as f:
             f.write(final_html)
+
+    def create_game_wrapper(self, game_id, game_name, index_rel):
+        """Creates an HTML wrapper for the game to handle scaling using an iframe."""
+        template_path = _current_dir / 'src' / 'home-screen' / 'html' / 'game-wrapper.html'
+        if not template_path.exists():
+            logger.warning(f"Game wrapper template not found at {template_path}")
+            return
+
+        with open(template_path, 'r') as f:
+            content = f.read()
+
+        # Replace placeholders
+        content = content.replace('{{GAME_NAME}}', game_name)
+        content = content.replace('{{GAME_INDEX_URL}}', index_rel)
+
+        wrapper_path = self.games_dir / game_id / 'game.html'
+        with open(wrapper_path, 'w') as f:
+            f.write(content)
+        logger.info(f"  Created wrapper for {game_name} at {wrapper_path.relative_to(self.dist_dir)}")
 
     def build(self):
         """Main orchestrator function."""
