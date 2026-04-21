@@ -45,14 +45,82 @@
     lib = nixos-raspberrypi.lib;
 
     nixosModules = nixos-raspberrypi.nixosModules // {
-      docker = { config, pkgs, ... }: {
+      docker = { config, lib, pkgs, ... }: {
+        # Enable Docker for running the static web server
         virtualisation.docker.enable = true;
+
+        # Run the arcade static container
         virtualisation.oci-containers = {
           backend = "docker";
-          containers.nginx = {
-            image = "nginx:latest";
+          containers.arcade-static = {
+            image = "ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest";
             ports = [ "80:80" ];
           };
+        };
+
+        # Configure the browser to open the web server in kiosk mode
+        # We use a systemd user service for Chromium to make it robust (auto-restart)
+        systemd.user.services.chromium-kiosk = {
+          description = "Chromium Kiosk Service";
+          wantedBy = [ "graphical-session.target" ];
+          partOf = [ "graphical-session.target" ];
+          script = ''
+            # Wait for the static web server to be ready (Docker container)
+            while ! ${pkgs.curl}/bin/curl -s -o /dev/null -f http://localhost; do
+              ${pkgs.coreutils}/bin/sleep 2
+            done
+
+            # Clear any stale locks that might prevent starting after a crash
+            # Specifically handles cases where hostname changes (e.g. nixos -> ArcadeKast-UANT)
+            rm -f $HOME/.config/chromium/SingletonLock
+
+            exec ${pkgs.ungoogled-chromium}/bin/chromium \
+              --no-first-run \
+              --no-default-browser-check \
+              --kiosk \
+              --start-maximized \
+              --disable-infobars \
+              --password-store=basic \
+              --noerrdialogs \
+              --disable-session-crashed-bubble \
+              "http://localhost"
+          '';
+          serviceConfig = {
+            Restart = "always";
+            RestartSec = 3;
+            # Ensure we have a valid DISPLAY
+            Environment = "DISPLAY=:0";
+          };
+        };
+
+        # Configure the X session startup
+        # We use mkForce to override the default chromium startup in rpi5 configs
+        services.xserver.displayManager.sessionCommands = lib.mkForce ''
+          ${pkgs.xorg.xset}/bin/xset s off
+          ${pkgs.xorg.xset}/bin/xset -dpms
+          ${pkgs.xorg.xset}/bin/xset s noblank
+
+          # Hide mouse cursor when inactive
+          ${pkgs.unclutter-xfixes}/bin/unclutter --timeout 1 &
+
+          # Trigger the user service (systemd will handle the rest)
+          ${pkgs.systemd}/bin/systemctl --user start chromium-kiosk &
+        '';
+
+        # Ensure the user 'pi' can interact with docker if needed
+        users.users.pi.extraGroups = [ "docker" ];
+
+        # Always pull the latest image on startup if online
+        systemd.services.docker-arcade-static = {
+          preStart = lib.mkBefore ''
+            # Check for internet connectivity (ping 8.8.8.8)
+            if ${pkgs.iputils}/bin/ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+              echo "Internet detected, pulling latest arcade image..."
+              ${pkgs.docker}/bin/docker pull ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest || true
+            else
+              echo "No internet connection, skipping image pull."
+            fi
+          '';
         };
       };
 
@@ -167,6 +235,7 @@
           xorg.xset
           input-remapper
           evtest
+          unclutter-xfixes
         ];
 
         services.input-remapper.enable = true;
@@ -250,13 +319,6 @@
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "pi";
 
-            # Chromium autostart for the session.
-            services.xserver.displayManager.sessionCommands = ''
-              ${pkgs.xorg.xset}/bin/xset s off
-              ${pkgs.xorg.xset}/bin/xset -dpms
-              ${pkgs.xorg.xset}/bin/xset s noblank
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check "https://www.ratatype.com/keyboard-test/" &
-            '';
 
             # Disable screensaver and power management in X11
             services.xserver.serverFlagsSection = ''
@@ -297,13 +359,6 @@
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "pi";
 
-            # Chromium autostart for the session.
-            services.xserver.displayManager.sessionCommands = ''
-              ${pkgs.xorg.xset}/bin/xset s off
-              ${pkgs.xorg.xset}/bin/xset -dpms
-              ${pkgs.xorg.xset}/bin/xset s noblank
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check "https://www.ratatype.com/keyboard-test/" &
-            '';
 
             # Disable screensaver and power management in X11
             services.xserver.serverFlagsSection = ''
@@ -340,13 +395,6 @@
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "pi";
 
-            # Chromium autostart for the session.
-            services.xserver.displayManager.sessionCommands = ''
-              ${pkgs.xorg.xset}/bin/xset s off
-              ${pkgs.xorg.xset}/bin/xset -dpms
-              ${pkgs.xorg.xset}/bin/xset s noblank
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check "https://www.ratatype.com/keyboard-test/" &
-            '';
 
             # Disable screensaver and power management in X11
             services.xserver.serverFlagsSection = ''
@@ -386,13 +434,6 @@
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "pi";
 
-            # Chromium autostart for the session.
-            services.xserver.displayManager.sessionCommands = ''
-              ${pkgs.xorg.xset}/bin/xset s off
-              ${pkgs.xorg.xset}/bin/xset -dpms
-              ${pkgs.xorg.xset}/bin/xset s noblank
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check "https://www.ratatype.com/keyboard-test/" &
-            '';
 
             # Disable screensaver and power management in X11
             services.xserver.serverFlagsSection = ''

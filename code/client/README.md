@@ -18,3 +18,7 @@ UPDATE (boot):
 
 GENERATE Password for hashedPassword:
 `mkpasswd -m sha-512`
+
+## Credentials
+- **User**: `pi` | **Password**: `pi`
+- **User**: `root` | **Password**: `nixos`
