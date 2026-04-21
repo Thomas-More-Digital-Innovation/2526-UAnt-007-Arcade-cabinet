@@ -13,6 +13,7 @@ dependencies = [
     "fastapi[standard]",
     "docker",
     "puremagic",
+    "s3fs",
     "sqlalchemy",
 ]
 [project.optional-dependencies]

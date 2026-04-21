@@ -1,6 +1,13 @@
 import dotenv
+from pathlib import Path
 
-dotenv.load_dotenv()
+# Load env files deterministically so credentials in src/.env are always picked up.
+_app_dir = Path(__file__).resolve().parent
+_src_dir = _app_dir.parent
+_backend_dir = _src_dir.parent
+
+dotenv.load_dotenv(_backend_dir / ".env")
+dotenv.load_dotenv(_src_dir / ".env")
 
 from config import config
 import logging
@@ -11,22 +18,34 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from analyze_uploads.analyze_uploads import router as analyze_uploads_router
 from file_uploads.file_uploads import router as file_uploads_router
-from docker_builder.docker_builder import router as docker_builder_router
 from game.game import router as game_router
-from assets.assets import router as assets_router
+# from assets.assets import router as assets_router
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+origins = [
+    "http://localhost:9000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 app.include_router(game_router, prefix="/games", tags=["games"])
-app.include_router(assets_router, prefix="/assets", tags=["assets"])
+# app.include_router(assets_router, prefix="/assets", tags=["assets"])
 
 app.include_router(analyze_uploads_router)
 app.include_router(file_uploads_router, prefix="/file-uploads", tags=["assets"])
-app.include_router(docker_builder_router, prefix="/docker-builder", tags=["docker"])
 
 @app.get("/")
 async def root():
