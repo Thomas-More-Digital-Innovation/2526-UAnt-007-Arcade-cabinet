@@ -14,6 +14,11 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
 
+    nixos-raspberrypi = {
+      url = "github:nvmd/nixos-raspberrypi/main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     argononed = {
       # url = "git+file:../argononed?shallow=1";
       # url = "git+https://gitlab.com/DarkElvenAngel/argononed.git";
@@ -32,164 +37,147 @@
     flake-compat.url = "github:edolstra/flake-compat";
   };
 
-  outputs = { self, nixpkgs, argononed, nixos-images, ... }@inputs: let
-    rpiSystems = [ "aarch64-linux" "armv7l-linux" "armv6l-linux" ];
+  outputs = { self, nixpkgs, nixos-raspberrypi, argononed, nixos-images, ... }@inputs: let
     allSystems = nixpkgs.lib.systems.flakeExposed;
     forSystems = systems: f: nixpkgs.lib.genAttrs systems (system: f system);
-    mkRpiPkgs = nixpkgs: system: import nixpkgs {
-        inherit system; overlays = [
-          self.overlays.pkgs
-
-          self.overlays.bootloader
-          self.overlays.vendor-kernel
-          self.overlays.vendor-firmware
-          self.overlays.kernel-and-firmware
-
-          self.overlays.vendor-pkgs
-        ];
-      };
-    mkLegacyPackagesFor = nixpkgs: forSystems rpiSystems (mkRpiPkgs nixpkgs);
   in {
 
-    devShells = forSystems allSystems (system: let
-      pkgs = nixpkgs.legacyPackages.${system};
-    in {
-      default = pkgs.mkShell {
-        name = "nixos-raspberrypi";
-        nativeBuildInputs = with pkgs; [
-          nil # lsp language server for nix
-          nixpkgs-fmt
-          nix-output-monitor
-          bash-language-server
-          shellcheck
-          (pkgs.callPackage ./devshells/nix-build-to-cachix.nix {})
-        ];
+    lib = nixos-raspberrypi.lib;
+
+    nixosModules = nixos-raspberrypi.nixosModules // {
+      docker = { config, lib, pkgs, ... }: {
+        # Enable Docker for running the static web server
+        virtualisation.docker.enable = true;
+
+        # Run the arcade static container
+        virtualisation.oci-containers = {
+          backend = "docker";
+          containers.arcade-static = {
+            image = "ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest";
+            ports = [ "80:80" ];
+          };
+        };
+
+        # Configure the browser to open the web server in kiosk mode
+        # We use a systemd user service for Chromium to make it robust (auto-restart)
+        systemd.user.services.chromium-kiosk = {
+          description = "Chromium Kiosk Service";
+          wantedBy = [ "graphical-session.target" ];
+          partOf = [ "graphical-session.target" ];
+          script = ''
+            # Wait for the static web server to be ready (Docker container)
+            while ! ${pkgs.curl}/bin/curl -s -o /dev/null -f http://localhost; do
+              ${pkgs.coreutils}/bin/sleep 2
+            done
+
+            # Clear any stale locks that might prevent starting after a crash
+            # Specifically handles cases where hostname changes (e.g. nixos -> ArcadeKast-UANT)
+            rm -f $HOME/.config/chromium/SingletonLock
+
+            exec ${pkgs.ungoogled-chromium}/bin/chromium \
+              --no-first-run \
+              --no-default-browser-check \
+              --kiosk \
+              --start-maximized \
+              --disable-infobars \
+              --password-store=basic \
+              --noerrdialogs \
+              --disable-session-crashed-bubble \
+              "http://localhost"
+          '';
+          serviceConfig = {
+            Restart = "always";
+            RestartSec = 3;
+            # Ensure we have a valid DISPLAY
+            Environment = "DISPLAY=:0";
+          };
+        };
+
+        # Configure the X session startup
+        # We use mkForce to override the default chromium startup in rpi5 configs
+        services.xserver.displayManager.sessionCommands = lib.mkForce ''
+          ${pkgs.xorg.xset}/bin/xset s off
+          ${pkgs.xorg.xset}/bin/xset -dpms
+          ${pkgs.xorg.xset}/bin/xset s noblank
+
+          # Hide mouse cursor when inactive
+          ${pkgs.unclutter-xfixes}/bin/unclutter --timeout 1 &
+
+          # Trigger the user service (systemd will handle the rest)
+          ${pkgs.systemd}/bin/systemctl --user start chromium-kiosk &
+        '';
+
+        # Ensure the user 'pi' can interact with docker if needed
+        users.users.pi.extraGroups = [ "docker" ];
+
+        # Always pull the latest image on startup if online
+        systemd.services.docker-arcade-static = {
+          preStart = lib.mkBefore ''
+            # Check for internet connectivity (ping 8.8.8.8)
+            if ${pkgs.iputils}/bin/ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+              echo "Internet detected, pulling latest arcade image..."
+              ${pkgs.docker}/bin/docker pull ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest || true
+            else
+              echo "No internet connection, skipping image pull."
+            fi
+          '';
+        };
       };
-    });
 
-    lib = import ./lib ({
-      inherit (nixpkgs) lib;
-    } // inputs);
-
-    nixosModules = {
-      trusted-nix-caches = import ./modules/trusted-nix-caches.nix;
-      nixpkgs-rpi = import ./modules/nixpkgs-rpi.nix;
-
-      bootloader = import ./modules/system/boot/loader/raspberrypi;
-      default = import ./modules/raspberrypi.nix;
-
-      sd-image = import ./modules/installer/sd-card/sd-image-raspberrypi.nix;
-      immutable = import ./modules/immutable.nix;
-
-      pisugar-3 = import ./modules/pisugar-3.nix;
-
-      usb-gadget-ethernet = import ./modules/usb-gadget-ethernet.nix;
-
-      raspberry-pi-5 = {
-        base = import ./modules/raspberry-pi-5;
-        display-vc4 = import ./modules/display-vc4.nix;
-        display-rp1 = import ./modules/raspberry-pi-5/display-rp1.nix;
-        bluetooth = import ./modules/bluetooth.nix;
-        page-size-16k = import ./modules/raspberry-pi-5/page-size-16k.nix;
+      immutable = { config, lib, pkgs, ... }: {
+        fileSystems."/" = lib.mkForce {
+          device = "none";
+          fsType = "tmpfs";
+          options = [ "defaults" "size=512M" "mode=755" ];
+          neededForBoot = true;
+        };
+        fileSystems."/mnt-root" = {
+          device = "/dev/disk/by-label/NIXOS_SD";
+          fsType = "ext4";
+          neededForBoot = true;
+        };
+        fileSystems."/nix" = lib.mkForce {
+          device = "/mnt-root/nix";
+          options = [ "bind" "noatime" ];
+          neededForBoot = true;
+        };
+        fileSystems."/boot/firmware" = lib.mkDefault {
+          device = "/dev/disk/by-label/FIRMWARE";
+          fsType = "vfat";
+          options = [ "nofail" "noatime" "x-systemd.automount" ];
+          neededForBoot = true;
+        };
+        users.mutableUsers = false;
       };
 
-      raspberry-pi-4 = {
-        base = import ./modules/raspberry-pi-4.nix;
-        display-vc4 = import ./modules/display-vc4.nix;
-        bluetooth = import ./modules/bluetooth.nix;
-        # work-in-progress, untested
-        case-argonone = import ./modules/case-argononev2.nix { inherit argononed; };
-      };
-
-      raspberry-pi-3 = {
-        base = import ./modules/raspberry-pi-3.nix;
-      };
-
-      raspberry-pi-02 = {
-        base = import ./modules/raspberry-pi-02.nix;
-        display-vc4 = import ./modules/display-vc4.nix;
-        bluetooth = import ./modules/bluetooth.nix;
+      persistence = { config, lib, ... }: {
+        imports = [ inputs.impermanence.nixosModules.impermanence ];
+        environment.persistence."/mnt-root/persist" = {
+          hideMounts = true;
+          directories = [ "/var/log" "/var/lib/nixos" "/var/lib/systemd/coredump" ];
+          files = [
+            "/etc/machine-id"
+            "/etc/ssh/ssh_host_ed25519_key"
+            "/etc/ssh/ssh_host_ed25519_key.pub"
+            "/etc/ssh/ssh_host_rsa_key"
+            "/etc/ssh/ssh_host_rsa_key.pub"
+          ];
+        };
       };
     };
 
-    overlays = {
-      bootloader = import ./overlays/bootloader.nix;
+    overlays = nixos-raspberrypi.overlays;
 
-      pkgs = import ./overlays/pkgs.nix;
-      vendor-pkgs = import ./overlays/vendor-pkgs.nix;
-      jemalloc-page-size-16k = import ./overlays/jemalloc-page-size-16k.nix;
+    legacyPackages = nixos-raspberrypi.legacyPackages;
 
-      vendor-firmware = import ./overlays/vendor-firmware.nix;
-      vendor-kernel = import ./overlays/vendor-kernel.nix;
-
-      kernel-and-firmware = import ./overlays/linux-and-firmware.nix;
-
-      libpisp-default-config-path = import ./overlays/libpisp-default-config-path.nix;
-    };
-
-    # "RPi world": nixpkgs with all overlays applied "globally", i.e.
-    # all packages here depend on rpi's/optimized versions of the dependencies
-    # * used inside the modules, where a choice of "sane defaults" about the 
-    #   nixpkgs channel had to be made
-    # * binary cache is generated from this package set
-    legacyPackages = mkLegacyPackagesFor nixpkgs;
-
-    packages = forSystems rpiSystems (system: let
-      pkgs = self.legacyPackages.${system};
-    in {
-      ffmpeg_4 = pkgs.ffmpeg_4;
-      ffmpeg_6 = pkgs.ffmpeg_6;
-      ffmpeg_7 = pkgs.ffmpeg_7;
-      ffmpeg_7-headless = pkgs.ffmpeg_7-headless;
-      ffmpeg_8 = pkgs.ffmpeg_8;
-      ffmpeg_8-headless = pkgs.ffmpeg_8-headless;
-
-      kodi = pkgs.kodi;
-      kodi-gbm = pkgs.kodi-gbm;
-      kodi-wayland = pkgs.kodi-wayland;
-
-      libcamera = pkgs.libcamera;
-      libpisp = pkgs.libpisp;
-      libraspberrypi = pkgs.libraspberrypi;
-
-      raspberrypi-utils = pkgs.raspberrypi-utils;
-      raspberrypi-udev-rules = (pkgs.callPackage ./pkgs/raspberrypi/udev-rules.nix {});
-      rpicam-apps = pkgs.rpicam-apps;
-
-      vlc = pkgs.vlc;
-
-      # see legacyPackages.<system>.linuxAndFirmware for other versions of 
-      # the bundle
-      inherit (pkgs.linuxAndFirmware.default)
-        linux_rpi5 linuxPackages_rpi5
-        linux_rpi4 linuxPackages_rpi4
-        linux_rpi3 linuxPackages_rpi3
-        linux_rpi02 linuxPackages_rpi02
-        raspberrypifw raspberrypiWirelessFirmware;
-
-      argononed = pkgs.callPackage "${inputs.argononed}/OS/nixos/pkg.nix" {};
-
-      pisugar3-kmod = let
-        targetKernel = pkgs.linux_rpi02;
-      in (pkgs.linuxPackagesFor targetKernel).callPackage ./pkgs/pisugar-kmod.nix {
-        pisugarVersion = "3";
-      };
-      pisugar2-kmod = let
-        targetKernel = pkgs.linux_rpi02;
-      in (pkgs.linuxPackagesFor targetKernel).callPackage ./pkgs/pisugar-kmod.nix {
-        pisugarVersion = "2";
-      };
-
-      pisugar-power-manager-rs = pkgs.callPackage ./pkgs/pisugar-power-manager-rs.nix {};
-
-    });
+    packages = nixos-raspberrypi.packages;
 
     nixosConfigurations = let
 
       # TIP: To create "regular" nixosConfigurations look for
       # `nixosSystem` and `nixosSystemFull` helpers in `lib/`
-      mkNixOSRPiInstaller = modules: self.lib.nixosInstaller {
-        specialArgs = inputs // { nixos-raspberrypi = self; };
+      mkNixOSRPiInstaller = modules: nixos-raspberrypi.lib.nixosInstaller {
+        specialArgs = inputs;
         modules = [
           nixos-images.nixosModules.sdimage-installer
           ({ config, lib, modulesPath, ... }: {
@@ -205,10 +193,19 @@
         ] ++ modules;
       };
 
-      custom-user-config = ({ config, pkgs, lib, nixos-raspberrypi, ... }: {
+      custom-user-config = ({ config, pkgs, lib, ... }: {
+        imports = [ self.nixosModules.docker ];
 
         system.stateVersion = "25.11";
+        networking.hostName = "ArcadeKast-UANT";
         users.mutableUsers = false;
+
+        # Set keyboard layout to Belgian
+        i18n.defaultLocale = "en_US.UTF-8";
+        console.keyMap = "be-latin1";
+        services.xserver.xkb = {
+          layout = "be";
+        };
 
         services.openssh = {
           enable = true;
@@ -218,15 +215,9 @@
           };
         };
 
-        users.users.nixos = {
-          isNormalUser = true;
-          extraGroups = [ "wheel" ];
-          hashedPassword = "$6$1S4IKvCOc1FqhMig$ohQsKqzkDuES5DBMgYzzBE3OX53miz0T3MHzmIXlvhIrGxM2rAwHq0OEeJfe5FPB973jott3bC7U3u5E6LmOc.";
-        };
-
         users.users.pi = {
           isNormalUser = true;
-          extraGroups = [ "wheel" ];
+          extraGroups = [ "wheel" "docker" "input" "video" "plugdev" ];
           hashedPassword = "$6$8HEfeFVwfLMMhpY.$e8ZgUExdBzdyi/zZW2Y10M0XdKAuEZ6anx3TNBJz3SyKDt.p7HuxRFWOf.X4yO/ubZ29I2M.Y0n3MUfgOebNR.";
         };
 
@@ -241,7 +232,15 @@
           fastfetch
           ungoogled-chromium
           dnsutils
+          xorg.xset
+          input-remapper
+          evtest
+          unclutter-xfixes
         ];
+
+        services.input-remapper.enable = true;
+
+        boot.kernelParams = [ "consoleblank=0" ];
 
         system.nixos.tags = let
           cfg = config.boot.loader.raspberry-pi;
@@ -296,18 +295,17 @@
         custom-user-config
       ];
 
-      rpi5 = self.lib.nixosSystem {
-        specialArgs = inputs // { nixos-raspberrypi = self; };
+      rpi5 = nixos-raspberrypi.lib.nixosSystem {
+        specialArgs = inputs;
         modules = [
           ({ config, pkgs, lib, nixos-raspberrypi, ... }: {
-            imports = with nixos-raspberrypi.nixosModules; [
-              # Hardware configuration
-              raspberry-pi-5.base
-              raspberry-pi-5.page-size-16k
-              raspberry-pi-5.display-vc4
+            imports = [
+              nixos-raspberrypi.nixosModules.raspberry-pi-5.base
+              nixos-raspberrypi.nixosModules.raspberry-pi-5.page-size-16k
+              nixos-raspberrypi.nixosModules.raspberry-pi-5.display-vc4
 
               # Add the sd-image module to make it a bootable SD image
-              sd-image
+              nixos-raspberrypi.nixosModules.sd-image
             ];
 
             # Enable the X11 windowing system.
@@ -321,29 +319,33 @@
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "pi";
 
-            # Chromium autostart for the session.
-            services.xserver.displayManager.sessionCommands = ''
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check &
+
+            # Disable screensaver and power management in X11
+            services.xserver.serverFlagsSection = ''
+              Option "BlankTime" "0"
+              Option "StandbyTime" "0"
+              Option "SuspendTime" "0"
+              Option "OffTime" "0"
             '';
           })
           custom-user-config
         ];
       };
 
-      rpi5-immutable = self.lib.nixosSystem {
-        specialArgs = inputs // { nixos-raspberrypi = self; };
+      rpi5-immutable = nixos-raspberrypi.lib.nixosSystem {
+        specialArgs = inputs;
         modules = [
           ({ config, pkgs, lib, nixos-raspberrypi, ... }: {
-            imports = with nixos-raspberrypi.nixosModules; [
-              # Hardware configuration
-              raspberry-pi-5.base
-              raspberry-pi-5.page-size-16k
-              raspberry-pi-5.display-vc4
+            imports = [
+              nixos-raspberrypi.nixosModules.raspberry-pi-5.base
+              nixos-raspberrypi.nixosModules.raspberry-pi-5.page-size-16k
+              nixos-raspberrypi.nixosModules.raspberry-pi-5.display-vc4
 
               # Add the sd-image module to make it a bootable SD image
-              sd-image
+              nixos-raspberrypi.nixosModules.sd-image
               # Make it immutable/stateless
-              immutable
+              self.nixosModules.immutable
+              self.nixosModules.persistence
             ];
 
             # Enable the X11 windowing system.
@@ -357,9 +359,88 @@
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "pi";
 
-            # Chromium autostart for the session.
-            services.xserver.displayManager.sessionCommands = ''
-              ${pkgs.ungoogled-chromium}/bin/chromium --no-first-run --no-default-browser-check &
+
+            # Disable screensaver and power management in X11
+            services.xserver.serverFlagsSection = ''
+              Option "BlankTime" "0"
+              Option "StandbyTime" "0"
+              Option "SuspendTime" "0"
+              Option "OffTime" "0"
+            '';
+          })
+          custom-user-config
+        ];
+      };
+
+      rpi4 = nixos-raspberrypi.lib.nixosSystem {
+        specialArgs = inputs;
+        modules = [
+          ({ config, pkgs, lib, nixos-raspberrypi, ... }: {
+            imports = [
+              nixos-raspberrypi.nixosModules.raspberry-pi-4.base
+              nixos-raspberrypi.nixosModules.raspberry-pi-4.display-vc4
+
+              # Add the sd-image module to make it a bootable SD image
+              nixos-raspberrypi.nixosModules.sd-image
+            ];
+
+            # Enable the X11 windowing system.
+            services.xserver.enable = true;
+
+            # Enable Openbox (extremely lightweight window manager).
+            services.xserver.windowManager.openbox.enable = true;
+            services.xserver.displayManager.lightdm.enable = true;
+
+            # Configure auto-login for the 'pi' user.
+            services.displayManager.autoLogin.enable = true;
+            services.displayManager.autoLogin.user = "pi";
+
+
+            # Disable screensaver and power management in X11
+            services.xserver.serverFlagsSection = ''
+              Option "BlankTime" "0"
+              Option "StandbyTime" "0"
+              Option "SuspendTime" "0"
+              Option "OffTime" "0"
+            '';
+          })
+          custom-user-config
+        ];
+      };
+
+      rpi4-immutable = nixos-raspberrypi.lib.nixosSystem {
+        specialArgs = inputs;
+        modules = [
+          ({ config, pkgs, lib, nixos-raspberrypi, ... }: {
+            imports = [
+              nixos-raspberrypi.nixosModules.raspberry-pi-4.base
+              nixos-raspberrypi.nixosModules.raspberry-pi-4.display-vc4
+
+              # Add the sd-image module to make it a bootable SD image
+              nixos-raspberrypi.nixosModules.sd-image
+              # Make it immutable/stateless
+              self.nixosModules.immutable
+              self.nixosModules.persistence
+            ];
+
+            # Enable the X11 windowing system.
+            services.xserver.enable = true;
+
+            # Enable Openbox (extremely lightweight window manager).
+            services.xserver.windowManager.openbox.enable = true;
+            services.xserver.displayManager.lightdm.enable = true;
+
+            # Configure auto-login for the 'pi' user.
+            services.displayManager.autoLogin.enable = true;
+            services.displayManager.autoLogin.user = "pi";
+
+
+            # Disable screensaver and power management in X11
+            services.xserver.serverFlagsSection = ''
+              Option "BlankTime" "0"
+              Option "StandbyTime" "0"
+              Option "SuspendTime" "0"
+              Option "OffTime" "0"
             '';
           })
           custom-user-config
@@ -371,19 +452,31 @@
     installerImages = let
       nixos = self.nixosConfigurations;
       mkImage = nixosConfig: nixosConfig.config.system.build.sdImage;
+      mkUncompressed = nixosConfig: (nixosConfig.extendModules {
+        modules = [ { sdImage.compressImage = false; } ];
+      }).config.system.build.sdImage;
     in {
       rpi02 = mkImage nixos.rpi02-installer;
+      rpi02-uncompressed = mkUncompressed nixos.rpi02-installer;
       rpi3 = mkImage nixos.rpi3-installer;
+      rpi3-uncompressed = mkUncompressed nixos.rpi3-installer;
       rpi4 = mkImage nixos.rpi4-installer;
+      rpi4-uncompressed = mkUncompressed nixos.rpi4-installer;
       rpi5 = mkImage nixos.rpi5-installer;
+      rpi5-uncompressed = mkUncompressed nixos.rpi5-installer;
     };
 
     sdImages = let
       nixos = self.nixosConfigurations;
       mkImage = nixosConfig: nixosConfig.config.system.build.sdImage;
+      mkUncompressed = nixosConfig: (nixosConfig.extendModules {
+        modules = [ { sdImage.compressImage = false; } ];
+      }).config.system.build.sdImage;
     in {
       rpi5 = mkImage nixos.rpi5;
+      rpi5-uncompressed = mkUncompressed nixos.rpi5;
       rpi5-immutable = mkImage nixos.rpi5-immutable;
+      rpi5-immutable-uncompressed = mkUncompressed nixos.rpi5-immutable;
     };
 
   };

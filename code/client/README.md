@@ -1,7 +1,10 @@
 BUILD (Regular SD):  `nix build .#sdImages.rpi5 --print-build-logs`
+BUILD (Uncompressed): `nix build .#sdImages.rpi5-uncompressed --print-build-logs`
 BUILD (Immutable): `nix build .#sdImages.rpi5-immutable --print-build-logs`
+BUILD (Immutable-Uncompressed): `nix build .#sdImages.rpi5-immutable-uncompressed --print-build-logs`
 
-FLASH: `zstdcat result/sd-image/*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync`
+FLASH (Compressed): `zstdcat result/sd-image/*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync`
+FLASH (Uncompressed): `sudo dd if=result/sd-image/*.img of=/dev/sdX bs=4M status=progress conv=fsync`
 DECOMPRESS: `zstd -d result/sd-image/nixos* -o rpi5-nixos.img`
 CALIGULA: `sudo caligula burn result/sd-image/nixos*`
 
@@ -15,3 +18,7 @@ UPDATE (boot):
 
 GENERATE Password for hashedPassword:
 `mkpasswd -m sha-512`
+
+## Credentials
+- **User**: `pi` | **Password**: `pi`
+- **User**: `root` | **Password**: `nixos`
