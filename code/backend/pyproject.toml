@@ -15,6 +15,7 @@ dependencies = [
     "puremagic",
     "s3fs",
     "sqlalchemy",
+    "psycopg2-binary",
     "httpx",
 ]
 [project.optional-dependencies]
