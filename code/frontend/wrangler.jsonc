@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "2526-uant-007-arcade-cabinet",
+  "compatibility_date": "2026-04-21",
+
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+
+  "observability": {
+    "enabled": true
+  },
+
+  "assets": {
+    "directory": "dist/spa",
+    "binding": "ASSETS"
+  },
+
+  "routes": []
+}
