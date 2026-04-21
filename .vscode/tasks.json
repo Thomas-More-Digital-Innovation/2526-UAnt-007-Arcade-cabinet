@@ -1,0 +1,30 @@
+{
+	       "version": "2.0.0",
+	       "tasks": [
+		       {
+			       "label": "Start Backend (venv)",
+			       "type": "shell",
+			       "command": "cd ./code/backend/ && source .venv/bin/activate && uvicorn src.app.main:app --reload",
+			       "args": [],
+			       "isBackground": true,
+			       "problemMatcher": [],
+			       "group": "build"
+		       },
+		       {
+			       "label": "Start Frontend (pnpm)",
+			       "type": "shell",
+			       "command": "cd ./code/frontend/ && npm run dev",
+			       "isBackground": true,
+			       "problemMatcher": [],
+			       "group": "build"
+		       },
+		       {
+			       "label": "dev",
+			       "dependsOn": [
+				       "Start Backend (venv)",
+				       "Start Frontend (pnpm)"
+			       ],
+			       "problemMatcher": []
+		       }
+	       ]
+}
