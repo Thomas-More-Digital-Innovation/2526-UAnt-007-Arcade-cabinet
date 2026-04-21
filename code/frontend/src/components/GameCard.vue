@@ -43,7 +43,7 @@
             <iframe
               v-if="gameOpen"
               ref="iframeRef"
-              :src="`${api.defaults.baseURL}/games/${props.id}/test`"
+              :src="`${api.defaults.baseURL}/games/${props.id}/test?api_key=${apiKey}`"
               class="game-iframe"
               :style="{ width: nativeW + 'px', height: nativeH + 'px' }"
               frameborder="0"
@@ -73,6 +73,8 @@ const emit = defineEmits(['edit', 'update:modal', 'delete']);
 // ── State ─────────────────────────────────────────────────────────────────────
 const gameOpen = ref(false);
 const iframeRef = ref<HTMLIFrameElement | null>(null);
+
+const apiKey = import.meta.env.VITE_API_KEY;
 
 /** Native (unscaled) dimensions of the game page */
 const nativeW = ref(1280);

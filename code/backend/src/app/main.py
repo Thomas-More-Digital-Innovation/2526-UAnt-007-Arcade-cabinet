@@ -17,7 +17,8 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security, Depends, Response, Cookie
+from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from analyze_uploads.analyze_uploads import router as analyze_uploads_router
 from file_uploads.file_uploads import router as file_uploads_router
@@ -27,7 +28,29 @@ from trigger_build.trigger_build import router as trigger_build_router
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def get_api_key(
+    response: Response,
+    api_key_header: str = Security(api_key_header),
+    api_key_query: str = None,
+    api_key_cookie: str = Cookie(None, alias="api_key")
+):
+    if not config.api_key:
+        return None # Dev mode or not configured
+    
+    key = api_key_header or api_key_query or api_key_cookie
+    if key == config.api_key:
+        if not api_key_cookie:
+            response.set_cookie(key="api_key", value=key, httponly=True, samesite="lax")
+        return key
+        
+    raise HTTPException(
+        status_code=403,
+        detail="Could not validate credentials",
+    )
+
+app = FastAPI(dependencies=[Depends(get_api_key)])
 
 origins = [
     "http://localhost:9000",

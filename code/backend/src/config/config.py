@@ -15,3 +15,4 @@ db_string = os.getenv('DB_STRING', 'sqlite:///database.db')
 
 github_repo_url = os.getenv('GITHUB_REPO_URL', '')
 github_token = os.getenv('GITHUB_TOKEN', '')
+api_key = os.getenv('API_KEY', '')
