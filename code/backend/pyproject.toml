@@ -11,8 +11,16 @@ authors = [
 dynamic = ["version"]
 dependencies = [
     "fastapi[standard]",
+    "docker",
+    "puremagic",
+    "s3fs",
+    "sqlalchemy",
+    "psycopg2-binary",
+    "httpx",
 ]
 [project.optional-dependencies]
 dev = [
     "pytest",
 ]
+[tool.setuptools.packages.find]
+where = ["src"]

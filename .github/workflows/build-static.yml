@@ -1,0 +1,77 @@
+name: Build Static Arcade
+
+on:
+  repository_dispatch:
+    types: [trigger]
+  workflow_dispatch: # Allow manual trigger for testing
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install s3fs python-dotenv jinja2
+
+      - name: Prepare Payload
+        run: |
+          echo '${{ toJson(github.event.client_payload) }}' > code/backend/workflow_payload.json
+          # If manually triggered, create a dummy payload or use existing test file
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo '{"games":[], "assets":[]}' > code/backend/workflow_payload.json
+          fi
+
+      - name: Build Static Site
+        working-directory: code/backend
+        env:
+          S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_SESSION_TOKEN: ${{ secrets.S3_SESSION_TOKEN }}
+          UPLOADS_REMOTE_ROOT: ${{ secrets.UPLOADS_REMOTE_ROOT }}
+        run: |
+          python3 build_static.py
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/arcade-cabinet-static
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: code/backend
+          file: code/backend/Dockerfile.static
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

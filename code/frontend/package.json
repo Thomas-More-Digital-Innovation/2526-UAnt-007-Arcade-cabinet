@@ -1,31 +1,50 @@
 {
   "name": "frontend",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.0.1",
+  "description": "The frontend for the UA arcade cabinet",
+  "productName": "UA-Arcade-Cabinet-Frontend",
+  "author": "David Maat <r1036789@student.thomasmore.be>",
   "type": "module",
+  "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
-    "preview": "vite preview",
-    "build-only": "vite build",
-    "type-check": "vue-tsc --build"
+    "lint": "eslint -c ./eslint.config.js \"./src*/**/*.{ts,js,cjs,mjs,vue}\"",
+    "format": "prettier --write \"**/*.{js,ts,vue,css,html,md,json}\" --ignore-path .gitignore",
+    "test": "echo \"No test specified\" && exit 0",
+    "dev": "quasar dev",
+    "build": "quasar build",
+    "postinstall": "quasar prepare"
   },
   "dependencies": {
-    "vue": "^3.5.30",
+    "@quasar/extras": "^1.16.4",
+    "@tailwindcss/postcss": "^4.2.2",
+    "axios": "^1.14.0",
+    "pinia": "^3.0.1",
+    "quasar": "^2.16.0",
+    "vue": "^3.5.22",
     "vue-router": "^5.0.3"
   },
   "devDependencies": {
-    "@tsconfig/node24": "^24.0.4",
-    "@types/node": "^24.12.0",
-    "@vitejs/plugin-vue": "^6.0.4",
-    "@vue/tsconfig": "^0.9.0",
-    "npm-run-all2": "^8.0.4",
-    "typescript": "~5.9.3",
-    "vite": "beta",
-    "vite-plugin-vue-devtools": "^8.0.7",
-    "vue-tsc": "^3.2.5"
+    "@eslint/js": "^9.39.4",
+    "@quasar/app-vite": "^2.5.1",
+    "@types/node": "^22.19.11",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.4",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
+    "postcss": "^8.5.8",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "vite-plugin-checker": "^0.12.0",
+    "vue-eslint-parser": "^10.4.0",
+    "vue-tsc": "^3.2.6"
   },
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": "^28 || ^26 || ^24 || ^22.12",
+    "npm": ">= 6.13.4",
+    "yarn": ">= 1.21.1",
+    "pnpm": ">= 10.0.0"
   }
 }
