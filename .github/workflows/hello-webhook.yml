@@ -1,0 +1,11 @@
+name: External Trigger
+
+on:
+  repository_dispatch:
+    types: [trigger]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Triggered externally"
