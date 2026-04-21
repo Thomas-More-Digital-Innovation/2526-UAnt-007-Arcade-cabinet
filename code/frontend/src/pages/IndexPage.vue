@@ -137,7 +137,9 @@
                           label="Upload"
                           unelevated
                           :loading="uploadingAssetPath === asset.path"
-                          :disable="!replacementFiles[asset.path] || uploadingAssetPath === asset.path"
+                          :disable="
+                            !replacementFiles[asset.path] || uploadingAssetPath === asset.path
+                          "
                           @click="uploadReplacementAsset(asset)"
                         />
                       </div>
@@ -222,7 +224,9 @@ function setReplacementFile(originalPath: string, file: File | File[] | null) {
 
 async function loadAssetOverrides(gameId: string) {
   const response = await api.get(`/games/${gameId}/asset-overrides`);
-  const paths = new Set<string>((response.data.overrides ?? []).map((o: { original_path: string }) => o.original_path));
+  const paths = new Set<string>(
+    (response.data.overrides ?? []).map((o: { original_path: string }) => o.original_path),
+  );
   replacementPaths.value = paths;
 }
 
@@ -309,15 +313,24 @@ async function uploadReplacementAsset(asset: AnalyzedAsset) {
   }
 }
 
-function updateGame() {
-  api.put(`/games/${modalGame.id}`, { id: modalGame.id, name: modalGame.name }).then((response) => {
+async function updateGame() {
+  try {
+    const response = await api.put(`/games/${modalGame.id}`, {
+      id: modalGame.id,
+      name: modalGame.name,
+    });
+
     const updatedGame = response.data.game;
     if (!updatedGame) return;
+
     const idx = data.findIndex((g) => g.id === updatedGame.id);
     if (idx !== -1 && data[idx]) {
       data[idx].name = updatedGame.name;
     }
-  });
+  } catch (err) {
+    // handle or log error
+    console.error(err);
+  }
 }
 
 function deleteGame(params: { id: string }) {
@@ -331,12 +344,18 @@ function deleteGame(params: { id: string }) {
     },
   })
     .onOk(() => {
-      api.delete(`/games/${params.id}`).then(() => {
-        const idx = data.findIndex((g) => g.id === params.id);
-        if (idx !== -1) {
-          data.splice(idx, 1);
+      void (async () => {
+        try {
+          await api.delete(`/games/${params.id}`);
+
+          const idx = data.findIndex((g) => g.id === params.id);
+          if (idx !== -1) {
+            data.splice(idx, 1);
+          }
+        } catch (err) {
+          console.error(err);
         }
-      });
+      })();
     })
     .onCancel(() => {
       // console.log('>>>> Cancel')
@@ -346,18 +365,26 @@ function deleteGame(params: { id: string }) {
     });
 }
 
-function loadData() {
-  api.get('/games').then((response) => {
+async function loadData() {
+  try {
+    const response = await api.get('/games');
     data.splice(0, data.length, ...response.data.games);
-  });
+  } catch (err) {
+    console.error(err);
+  }
 }
 
-function updatePi() {
-  api.post('/trigger-build/trigger-workflow').then(() => {
+async function updatePi() {
+  try {
+    await api.post('/trigger-build/trigger-workflow');
     $q.notify({ type: 'positive', message: 'Pi update triggered.' });
-  });
+  } catch (err) {
+    console.error(err);
+    $q.notify({ type: 'negative', message: 'Failed to trigger update.' });
+  }
 }
 
-// Load data on component creation
-loadData();
+loadData().catch((err) => {
+  console.error(err);
+});
 </script>
