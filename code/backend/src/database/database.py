@@ -12,7 +12,8 @@ from config import config
 import logging
 
 from sqlalchemy import create_engine, func
-engine = create_engine("sqlite:///database.db", echo=False)
+
+engine = create_engine(config.db_string, echo=False)
 
 level = getattr(logging, config.db_log_level.upper(), logging.INFO)
 
