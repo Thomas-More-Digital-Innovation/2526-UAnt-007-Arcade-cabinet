@@ -17,7 +17,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-from fastapi import FastAPI, HTTPException, Security, Depends, Response, Cookie, Query
+from fastapi import FastAPI, HTTPException, Security, Depends, Response, Cookie, Query, Request
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from analyze_uploads.analyze_uploads import router as analyze_uploads_router
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def get_api_key(
+    request: Request,
     response: Response,
     api_key_header: str = Security(api_key_header),
     api_key_query: str = Query(None, alias="api_key"),
@@ -39,10 +40,26 @@ async def get_api_key(
     if not config.api_key:
         return None # Dev mode or not configured
     
+    # Primary check: direct credentials
     key = api_key_header or api_key_query or api_key_cookie
+    
+    # Fallback check: Referer header (helpful for sub-resources in iframes where cookies are blocked)
+    if not key:
+        referer = request.headers.get("referer")
+        if referer and f"api_key={config.api_key}" in referer:
+            key = config.api_key
+
     if key == config.api_key:
         if not api_key_cookie:
-            response.set_cookie(key="api_key", value=key, httponly=True, samesite="lax")
+            is_https = request.url.scheme == "https"
+            response.set_cookie(
+                key="api_key",
+                value=key,
+                httponly=True,
+                samesite="none" if is_https else "lax",
+                secure=is_https,
+                path="/"
+            )
         return key
         
     raise HTTPException(
