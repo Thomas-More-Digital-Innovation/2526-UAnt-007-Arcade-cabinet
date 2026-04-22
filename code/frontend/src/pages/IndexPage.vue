@@ -19,8 +19,22 @@
       />
     </div>
 
+    <!-- Game skeleton loaders -->
+    <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+      <q-card v-for="i in 3" :key="`skeleton-${i}`">
+        <q-card-section class="flex items-center justify-between">
+          <q-skeleton type="text" width="50%" class="text-h6" animation="fade" />
+          <q-skeleton type="QBtn" width="80px" height="36px" animation="fade" />
+        </q-card-section>
+        <q-card-section class="flex gap-2 justify-end">
+          <q-skeleton type="QBtn" width="80px" height="36px" animation="fade" />
+          <q-skeleton type="QBtn" width="100px" height="36px" animation="fade" />
+        </q-card-section>
+      </q-card>
+    </div>
+
     <!-- Game cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
       <game-card
         v-for="game in data"
         :key="game.id"
@@ -251,6 +265,7 @@ interface AnalyzedAsset {
 
 const $q = useQuasar();
 
+const isLoading = ref(true);
 const data = reactive<Game[]>([]);
 const confirm = ref(false);
 const isEditMode = ref(false);
@@ -460,11 +475,14 @@ function deleteGame(params: { id: string }) {
 }
 
 async function loadData() {
+  isLoading.value = true;
   try {
     const response = await api.get('/games');
     data.splice(0, data.length, ...response.data.games);
   } catch (err) {
     console.error(err);
+  } finally {
+    isLoading.value = false;
   }
 }
 
