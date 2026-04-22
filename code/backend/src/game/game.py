@@ -68,11 +68,26 @@ def delete_game(game_id: UUID, db: Session = Depends(database.get_session)):
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     
-    # Delete associated zip uploads and assets
+    # Delete associated zip uploads and assets from DB and S3
     for zip_upload in game.zip_uploads:
+        try:
+            uploads_storage.delete_path(uploads_storage.uploaded_zip_uri(zip_upload.name))
+            uploads_storage.delete_path(uploads_storage.extracted_root_uri(zip_upload.name), recursive=True)
+        except Exception as e:
+            logger.error(f"Error deleting zip {zip_upload.name} from S3: {e}")
         db.delete(zip_upload)
+        
     for asset in game.assets:
+        try:
+            uploads_storage.delete_path(asset.path)
+        except Exception as e:
+            logger.error(f"Error deleting asset {asset.path} from S3: {e}")
         db.delete(asset)
+
+    try:
+        uploads_storage.delete_path(uploads_storage._remote_uri("asset_overrides", str(game_id)), recursive=True)
+    except Exception as e:
+        logger.error(f"Error deleting asset overrides for game {game_id} from S3: {e}")
 
     db.delete(game)
     db.commit()

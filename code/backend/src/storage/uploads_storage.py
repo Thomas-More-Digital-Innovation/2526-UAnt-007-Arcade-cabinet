@@ -111,5 +111,13 @@ class UploadStorage:
         guessed, _ = mimetypes.guess_type(path)
         return guessed
 
+    def delete_path(self, path: str, recursive: bool = False) -> None:
+        try:
+            if self._s3().exists(path):
+                self._s3().rm(path, recursive=recursive)
+        except Exception as e:
+            # Optionally log, or allow failure if bucket doesn't actually have the file
+            pass
+
 
 uploads_storage = UploadStorage()
