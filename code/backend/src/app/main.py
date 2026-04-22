@@ -50,10 +50,13 @@ async def get_api_key(
         detail="Could not validate credentials",
     )
 
+port = config.port
+
 app = FastAPI(dependencies=[Depends(get_api_key)])
 
 origins = [
     "http://localhost:9000",
+    'https://ua-manage-arcade.digitalinnovation.be'
 ]
 
 app.add_middleware(
