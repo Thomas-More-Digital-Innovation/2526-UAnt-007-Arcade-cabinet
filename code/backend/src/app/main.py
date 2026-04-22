@@ -17,7 +17,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-from fastapi import FastAPI, HTTPException, Security, Depends, Response, Cookie
+from fastapi import FastAPI, HTTPException, Security, Depends, Response, Cookie, Query
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from analyze_uploads.analyze_uploads import router as analyze_uploads_router
@@ -33,7 +33,7 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 async def get_api_key(
     response: Response,
     api_key_header: str = Security(api_key_header),
-    api_key_query: str = None,
+    api_key_query: str = Query(None, alias="api_key"),
     api_key_cookie: str = Cookie(None, alias="api_key")
 ):
     if not config.api_key:

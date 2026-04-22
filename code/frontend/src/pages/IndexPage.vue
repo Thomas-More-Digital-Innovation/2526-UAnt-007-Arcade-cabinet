@@ -262,6 +262,7 @@ const replacementFiles = reactive<Record<string, File | null>>({});
 const uploadingAssetPath = ref<string | null>(null);
 const uploaderRef = ref();
 const isAddingGame = ref(false);
+const apiKey = import.meta.env.VITE_API_KEY;
 
 // Workflow feedback state
 const workflowModalOpen = ref(false);
@@ -293,12 +294,12 @@ function isImageAsset(asset: AnalyzedAsset) {
 
 function assetOriginalPreviewUrl(asset: AnalyzedAsset) {
   if (!modalGame.id) return '';
-  return `${api.defaults.baseURL}/games/${modalGame.id}/original/${encodeURI(asset.path)}`;
+  return `${api.defaults.baseURL}/games/${modalGame.id}/original/${encodeURI(asset.path)}?api_key=${apiKey}`;
 }
 
 function assetReplacementPreviewUrl(asset: AnalyzedAsset) {
   if (!modalGame.id) return '';
-  return `${api.defaults.baseURL}/games/${modalGame.id}/replacement/${encodeURI(asset.path)}?t=${Date.now()}`;
+  return `${api.defaults.baseURL}/games/${modalGame.id}/replacement/${encodeURI(asset.path)}?api_key=${apiKey}&t=${Date.now()}`;
 }
 
 function hasReplacement(originalPath: string) {
