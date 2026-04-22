@@ -66,9 +66,10 @@
             :auto-upload="false"
             :hide-upload-btn="true"
           />
-          <div v-else>
-            <div class="text-subtitle2 q-mb-md">Analyzed ZIP assets</div>
-            <q-list bordered separator class="rounded-borders">
+        </q-card-section>
+        <q-card-section v-if="isEditMode" class="scroll max-h-[50vh]">
+          <div class="text-subtitle2 q-mb-md">Analyzed ZIP assets</div>
+          <q-list bordered separator class="rounded-borders">
               <q-item v-if="loadingAnalyzedAssets">
                 <q-item-section class="flex items-center q-py-lg">
                   <q-spinner color="primary" size="3em" />
@@ -161,8 +162,7 @@
                   </div>
                 </q-item-section>
               </q-item>
-            </q-list>
-          </div>
+          </q-list>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn
