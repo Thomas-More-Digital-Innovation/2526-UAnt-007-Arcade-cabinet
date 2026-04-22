@@ -5,3 +5,4 @@ dist/
 .env
 src/uploads/
 *.db
+*.private-key.pem

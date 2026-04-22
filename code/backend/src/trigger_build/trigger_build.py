@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from config import config 
 
-import httpx, logging
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -11,19 +11,14 @@ from sqlalchemy.orm import Session
 from database import database
 import json
 
+from github import Github, Auth
+
 @router.post("/trigger-workflow")
 async def trigger_workflow(db: Session = Depends(database.get_session)):
-    if not config.github_repo_url or not config.github_token:
-        raise HTTPException(status_code=500, detail="GitHub configuration is missing")
+    if not all([config.github_app_id, config.github_private_key_path, config.github_installation_id, config.github_repo_owner, config.github_repo_name]):
+        raise HTTPException(status_code=500, detail="GitHub App configuration is missing")
     
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {config.github_token}",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
-    
-    # Fetch all game ids from the database
-    # Full DB dump (all tables as JSON)
+    # ... (serialization logic remains the same)
     def serialize_game(game):
         return {
             "id": str(game.id),
@@ -70,20 +65,23 @@ async def trigger_workflow(db: Session = Depends(database.get_session)):
         "assets": [serialize_asset(asset) for asset in assets]
     }
 
-    payload = {
-        "event_type": "trigger",
-        "client_payload": db_dump
-    }
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            config.github_repo_url,
-            headers=headers,
-            json=payload
+    try:
+        with open(config.github_private_key_path, 'r') as f:
+            private_key = f.read()
+        
+        auth = Auth.AppAuth(int(config.github_app_id), private_key).get_installation_auth(int(config.github_installation_id))
+        g = Github(auth=auth)
+        
+        repo_name = f"{config.github_repo_owner}/{config.github_repo_name}"
+        repo = g.get_repo(repo_name)
+        
+        repo.create_repository_dispatch(
+            event_type="trigger",
+            client_payload=db_dump
         )
         
-    if response.status_code not in (200, 204):
-        logger.error(f"Failed to trigger workflow: {response.text}")
-        raise HTTPException(status_code=response.status_code, detail="Failed to trigger workflow")
+    except Exception as e:
+        logger.error(f"Failed to trigger workflow: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to trigger workflow: {str(e)}")
         
     return {"message": "Workflow triggered successfully"}
