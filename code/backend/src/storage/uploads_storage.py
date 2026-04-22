@@ -101,14 +101,8 @@ class UploadStorage:
             return False
 
     def upload_tree(self, local_dir: str, remote_prefix_uri: str) -> None:
-        remote_prefix_uri = remote_prefix_uri.rstrip("/")
-        local_root = Path(local_dir)
-        for local_path in local_root.rglob("*"):
-            if not local_path.is_file():
-                continue
-            rel = local_path.relative_to(local_root).as_posix()
-            remote_path = f"{remote_prefix_uri}/{rel}"
-            self._s3().put(str(local_path), remote_path)
+        # s3fs put() supports recursive=True and is highly optimized for directory uploads
+        self._s3().put(local_dir, remote_prefix_uri, recursive=True)
 
     def walk_files(self, prefix_uri: str) -> list[str]:
         return [p for p in self._s3().find(prefix_uri, withdirs=False)]

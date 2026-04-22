@@ -159,7 +159,73 @@
             v-close-popup
             @click="updateGame"
           />
-          <q-btn v-else flat label="Add" color="green" v-close-popup @click="addGame" />
+          <q-btn v-else flat label="Add" color="green" :loading="isAddingGame" @click="addGame" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <!-- Workflow Status Dialog -->
+    <q-dialog v-model="workflowModalOpen" persistent>
+      <q-card class="w-120 q-pa-lg text-center">
+        <q-card-section>
+          <div class="text-h6 q-mb-md">Update Status</div>
+          
+          <div v-if="workflowStatus !== 'completed'" class="flex flex-col items-center">
+            <q-spinner-orbit color="primary" size="4em" class="q-mb-lg" />
+            <div class="text-body1">
+              deploying games, please wait.<br />
+              <strong class="text-negative">Do not (re)start the pi yet</strong>
+            </div>
+            <div class="text-caption text-grey-7 q-mt-md">
+              Status: {{ workflowStatus || 'Initializing...' }}
+            </div>
+            
+            <div v-if="workflowProgress.total_steps > 0" class="w-full q-mt-lg">
+              <div class="row justify-between items-center q-mb-xs">
+                <div class="text-caption text-weight-bold">
+                  Step {{ workflowProgress.completed_steps + 1 }}/{{ workflowProgress.total_steps }}
+                </div>
+                <div class="text-caption text-grey-7">
+                  {{ Math.round((workflowProgress.completed_steps / workflowProgress.total_steps) * 100) }}%
+                </div>
+              </div>
+              <q-linear-progress 
+                :value="workflowProgress.completed_steps / workflowProgress.total_steps" 
+                color="primary" 
+                class="q-mb-sm"
+              />
+              <div class="text-caption text-grey-6 italic">
+                {{ workflowProgress.current_step }}
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="flex flex-col items-center">
+            <template v-if="workflowConclusion === 'success'">
+              <q-icon name="check_circle" color="positive" size="4em" class="q-mb-lg" />
+              <div class="text-body1">
+                Restart the pi with an internet connection to update the game selection.
+              </div>
+            </template>
+            <template v-else>
+              <q-icon name="error" color="negative" size="4em" class="q-mb-lg" />
+              <div class="text-body1 text-negative">
+                Workflow failed or was cancelled.
+              </div>
+              <div class="text-caption text-grey-7 q-mt-md">
+                Conclusion: {{ workflowConclusion }}
+              </div>
+            </template>
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="center" class="q-mt-md">
+          <q-btn
+            v-if="workflowStatus === 'completed'"
+            label="Close"
+            color="primary"
+            flat
+            @click="workflowModalOpen = false"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -167,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, onUnmounted } from 'vue';
 import { useQuasar } from 'quasar';
 import GameCard from '../components/GameCard.vue';
 import { api } from 'boot/axios';
@@ -195,6 +261,31 @@ const replacementPaths = ref<Set<string>>(new Set());
 const replacementFiles = reactive<Record<string, File | null>>({});
 const uploadingAssetPath = ref<string | null>(null);
 const uploaderRef = ref();
+const isAddingGame = ref(false);
+
+// Workflow feedback state
+const workflowModalOpen = ref(false);
+const workflowStatus = ref<string | null>(null);
+const workflowConclusion = ref<string | null>(null);
+const workflowProgress = reactive({
+  total_steps: 0,
+  completed_steps: 0,
+  current_step: ''
+});
+let triggerTime: number | null = null;
+let pollingTimeout: number | null = null;
+
+// Cleanup helper
+function stopPolling() {
+  if (pollingTimeout) {
+    clearTimeout(pollingTimeout);
+    pollingTimeout = null;
+  }
+}
+
+onUnmounted(() => {
+  stopPolling();
+});
 
 function isImageAsset(asset: AnalyzedAsset) {
   return asset.mime.startsWith('image/');
@@ -250,18 +341,27 @@ async function addGame() {
     $q.notify({ type: 'negative', message: 'Please select a ZIP file to upload.' });
     return;
   }
-  // Step 1: Create the game
-  const gameResp = await api.post('/games', { name: modalGame.name });
-  const newGame = gameResp.data.game;
-  // Step 2: Upload the ZIP file
-  const formData = new FormData();
-  formData.append('file', uploader.files[0]);
-  await api.post(`/file-uploads/upload-zip?game_id=${newGame.id}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-  data.push(newGame);
-  confirm.value = false;
-  resetModal();
+  
+  isAddingGame.value = true;
+  try {
+    // Step 1: Create the game
+    const gameResp = await api.post('/games', { name: modalGame.name });
+    const newGame = gameResp.data.game;
+    // Step 2: Upload the ZIP file
+    const formData = new FormData();
+    formData.append('file', uploader.files[0]);
+    await api.post(`/file-uploads/upload-zip?game_id=${newGame.id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    await loadData();
+    confirm.value = false;
+    resetModal();
+  } catch (err) {
+    console.error(err);
+    $q.notify({ type: 'negative', message: 'Failed to add game.' });
+  } finally {
+    isAddingGame.value = false;
+  }
 }
 
 async function onEditGame(game: Game) {
@@ -323,10 +423,7 @@ async function updateGame() {
     const updatedGame = response.data.game;
     if (!updatedGame) return;
 
-    const idx = data.findIndex((g) => g.id === updatedGame.id);
-    if (idx !== -1 && data[idx]) {
-      data[idx].name = updatedGame.name;
-    }
+    await loadData();
   } catch (err) {
     // handle or log error
     console.error(err);
@@ -347,11 +444,7 @@ function deleteGame(params: { id: string }) {
       void (async () => {
         try {
           await api.delete(`/games/${params.id}`);
-
-          const idx = data.findIndex((g) => g.id === params.id);
-          if (idx !== -1) {
-            data.splice(idx, 1);
-          }
+          await loadData();
         } catch (err) {
           console.error(err);
         }
@@ -374,13 +467,76 @@ async function loadData() {
   }
 }
 
+async function pollWorkflowStatus() {
+  // If modal was closed in the meantime, don't ping or schedule more
+  if (!workflowModalOpen.value) {
+    stopPolling();
+    return;
+  }
+
+  try {
+    const response = await api.get('/trigger-build/workflow-status');
+    const run = response.data;
+    
+    // Ignore runs created before we clicked the button
+    if (run.created_at) {
+      const runCreated = new Date(run.created_at).getTime();
+      if (triggerTime && runCreated < triggerTime) {
+        workflowStatus.value = 'waiting for start...';
+      } else {
+        workflowStatus.value = run.status;
+        workflowConclusion.value = run.conclusion;
+        
+        if (run.progress) {
+          workflowProgress.total_steps = run.progress.total_steps;
+          workflowProgress.completed_steps = run.progress.completed_steps;
+          workflowProgress.current_step = run.progress.current_step;
+        }
+      }
+    }
+
+    // Continue polling if not completed
+    if (workflowStatus.value !== 'completed') {
+      pollingTimeout = window.setTimeout(() => {
+        void pollWorkflowStatus();
+      }, 500);
+    } else {
+      stopPolling();
+    }
+  } catch (err) {
+    console.error('Error polling workflow status:', err);
+    stopPolling();
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to check update status. Please check your GitHub App permissions (Actions: Read-only).',
+      timeout: 10000
+    });
+    workflowModalOpen.value = false;
+  }
+}
+
 async function updatePi() {
   try {
+    workflowStatus.value = 'starting';
+    workflowConclusion.value = null;
+    workflowProgress.total_steps = 0;
+    workflowProgress.completed_steps = 0;
+    workflowProgress.current_step = '';
+    
+    triggerTime = Date.now() - 10000; // Give some buffer for clock skew
+    workflowModalOpen.value = true;
+
     await api.post('/trigger-build/trigger-workflow');
+    
+    // Start polling
+    stopPolling();
+    await pollWorkflowStatus();
+
     $q.notify({ type: 'positive', message: 'Pi update triggered.' });
   } catch (err) {
     console.error(err);
     $q.notify({ type: 'negative', message: 'Failed to trigger update.' });
+    workflowModalOpen.value = false;
   }
 }
 
