@@ -90,13 +90,17 @@
                   <div v-if="isImageAsset(asset)" class="q-mt-md">
                     <div class="row q-col-gutter-lg">
                       <div class="col-12 col-sm-6">
-                        <div class="text-overline q-mb-xs text-grey-7">Original</div>
+                        <div class="text-overline text-grey-7">Original</div>
+                        <div v-if="assetResolutions[asset.path]?.original" class="text-caption text-grey-6 q-mb-xs">
+                          {{ assetResolutions[asset.path]?.original }}px
+                        </div>
                         <q-img
                           :src="assetOriginalPreviewUrl(asset)"
                           :alt="`original-${asset.path}`"
                           fit="contain"
                           class="rounded-borders bg-grey-2 shadow-1"
                           style="width: 100%; height: 160px"
+                          @load="(src) => onOriginalImageLoad(asset.path, src)"
                         >
                           <template v-slot:error>
                             <div class="absolute-full flex flex-center bg-negative text-white">
@@ -106,7 +110,10 @@
                         </q-img>
                       </div>
                       <div class="col-12 col-sm-6">
-                        <div class="text-overline q-mb-xs text-grey-7">Replacement</div>
+                        <div class="text-overline text-grey-7">Replacement</div>
+                        <div v-if="assetResolutions[asset.path]?.replacement" class="text-caption text-grey-6 q-mb-xs">
+                          {{ assetResolutions[asset.path]?.replacement }}px
+                        </div>
                         <q-img
                           v-if="hasReplacement(asset.path)"
                           :src="assetReplacementPreviewUrl(asset)"
@@ -114,6 +121,7 @@
                           fit="contain"
                           class="rounded-borders bg-grey-2 shadow-1"
                           style="width: 100%; height: 160px"
+                          @load="(src) => onReplacementImageLoad(asset.path, src)"
                         >
                           <template v-slot:loading>
                             <q-spinner-oval color="white" />
@@ -279,6 +287,26 @@ const uploaderRef = ref();
 const isAddingGame = ref(false);
 const apiKey = import.meta.env.VITE_API_KEY;
 
+const assetResolutions = reactive<Record<string, { original?: string, replacement?: string }>>({});
+
+function onOriginalImageLoad(path: string, src: string) {
+  const img = new Image();
+  img.onload = () => {
+    if (!assetResolutions[path]) assetResolutions[path] = {};
+    assetResolutions[path].original = `${img.naturalWidth}x${img.naturalHeight}`;
+  };
+  img.src = src;
+}
+
+function onReplacementImageLoad(path: string, src: string) {
+  const img = new Image();
+  img.onload = () => {
+    if (!assetResolutions[path]) assetResolutions[path] = {};
+    assetResolutions[path].replacement = `${img.naturalWidth}x${img.naturalHeight}`;
+  };
+  img.src = src;
+}
+
 // Workflow feedback state
 const workflowModalOpen = ref(false);
 const workflowStatus = ref<string | null>(null);
@@ -349,6 +377,7 @@ function resetModal() {
     delete replacementFiles[k];
   });
   uploadingAssetPath.value = null;
+  Object.keys(assetResolutions).forEach(k => delete assetResolutions[k]);
 }
 
 async function addGame() {
@@ -385,6 +414,7 @@ async function onEditGame(game: Game) {
   modalGame.name = game.name;
   isEditMode.value = true;
   confirm.value = true;
+  Object.keys(assetResolutions).forEach(k => delete assetResolutions[k]);
 
   loadingAnalyzedAssets.value = true;
   analyzedAssets.value = [];
