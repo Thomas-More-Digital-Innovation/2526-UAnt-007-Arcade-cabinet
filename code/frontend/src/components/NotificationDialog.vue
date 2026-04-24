@@ -1,10 +1,10 @@
 <template>
   <q-dialog v-model="store.isOpen">
-    <q-card class="notification-card">
+    <q-card class="min-w-[350px] max-w-[500px] transition-all duration-300 ease-in-out">
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6 flex items-center gap-2">
           <q-icon :name="icon" size="sm" />
-          <span class="text-capitalize">{{ store.type }}</span>
+          <span class="capitalize">{{ store.type }}</span>
         </div>
         <q-space />
         <q-btn icon="close" flat round dense v-close-popup />
@@ -37,16 +37,3 @@ const icon = computed(() => {
   }
 });
 </script>
-
-<style scoped>
-.notification-card {
-  min-width: 350px;
-  max-width: 500px;
-  transition: all 0.3s ease;
-}
-
-
-.text-capitalize {
-  text-transform: capitalize;
-}
-</style>
