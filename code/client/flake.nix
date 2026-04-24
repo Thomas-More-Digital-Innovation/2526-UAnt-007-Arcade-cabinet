@@ -111,6 +111,9 @@
                 --password-store=basic \
                 --noerrdialogs \
                 --disable-session-crashed-bubble \
+                --disable-cache \
+                --disk-cache-size=1 \
+                --media-cache-size=1 \
                 "http://localhost"
             '';
             ExecStopPost = "${pkgs.docker}/bin/docker stop arcade-static || true";
