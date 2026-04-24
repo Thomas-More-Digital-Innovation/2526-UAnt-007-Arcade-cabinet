@@ -18,9 +18,10 @@
       <router-view />
     </q-page-container>
 
+    <notification-dialog />
   </q-layout>
 </template>
 
 <script setup lang="ts">
-
+import NotificationDialog from 'src/components/NotificationDialog.vue';
 </script>

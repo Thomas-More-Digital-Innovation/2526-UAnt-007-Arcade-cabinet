@@ -1,22 +1,8 @@
 <template>
   <q-page class="container mx-auto px-5 md:px-0">
     <div class="flex justify-between mt-10">
-      <q-btn
-        unelevated
-        icon="rocket_launch"
-        color="primary"
-        label="Update Pi"
-        :ripple="false"
-        @click="updatePi"
-      />
-      <q-btn
-        color="green"
-        icon="add"
-        label="Add Game"
-        unelevated
-        :ripple="false"
-        @click="confirm = true"
-      />
+      <q-btn unelevated icon="rocket_launch" color="primary" label="Update Pi" :ripple="false" @click="updatePi" />
+      <q-btn color="green" icon="add" label="Add Game" unelevated :ripple="false" @click="confirm = true" />
     </div>
 
     <!-- Game skeleton loaders -->
@@ -35,15 +21,8 @@
 
     <!-- Game cards -->
     <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-      <game-card
-        v-for="game in data"
-        :key="game.id"
-        :title="game.name"
-        :modal="modalGame"
-        :id="game.id"
-        @edit="onEditGame(game)"
-        @delete="deleteGame(game)"
-      />
+      <game-card v-for="game in data" :key="game.id" :title="game.name" :modal="modalGame" :id="game.id"
+        @edit="onEditGame(game)" @delete="deleteGame(game)" />
     </div>
 
     <!-- Add/Edit game dialog -->
@@ -57,141 +36,96 @@
         <q-card-section class="flex flex-col gap-4">
           <q-input v-model="modalGame.name" type="text" label="Game Name" />
           <!-- Show uploader only in add mode -->
-          <q-uploader
-            v-if="!isEditMode"
-            ref="uploaderRef"
-            accept=".zip"
-            label="Upload ZIP folder"
-            field-name="file"
-            :auto-upload="false"
-            :hide-upload-btn="true"
-          />
+          <q-uploader v-if="!isEditMode" ref="uploaderRef" accept=".zip" label="Upload ZIP folder" field-name="file"
+            :auto-upload="false" :hide-upload-btn="true" />
         </q-card-section>
         <q-card-section v-if="isEditMode" class="scroll max-h-[50vh]">
           <div class="text-subtitle2 q-mb-md">Analyzed ZIP assets</div>
           <q-list bordered separator class="rounded-borders">
-              <q-item v-if="loadingAnalyzedAssets">
-                <q-item-section class="flex items-center q-py-lg">
-                  <q-spinner color="primary" size="3em" />
-                  <div class="q-mt-md text-grey-7">Loading assets...</div>
-                </q-item-section>
-              </q-item>
-              <q-item v-else-if="analyzedAssets.length === 0">
-                <q-item-section class="text-center q-py-lg text-grey-7">
-                  <q-icon name="info" size="2em" class="q-mb-sm" />
-                  <div>No image/audio assets found.</div>
-                </q-item-section>
-              </q-item>
-              <q-item v-for="asset in analyzedAssets" :key="asset.path" class="q-py-md">
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">{{ asset.path }}</q-item-label>
-                  <q-item-label caption>{{ asset.mime }}</q-item-label>
+            <q-item v-if="loadingAnalyzedAssets">
+              <q-item-section class="flex items-center q-py-lg">
+                <q-spinner color="primary" size="3em" />
+                <div class="q-mt-md text-grey-7">Loading assets...</div>
+              </q-item-section>
+            </q-item>
+            <q-item v-else-if="analyzedAssets.length === 0">
+              <q-item-section class="text-center q-py-lg text-grey-7">
+                <q-icon name="info" size="2em" class="q-mb-sm" />
+                <div>No image/audio assets found.</div>
+              </q-item-section>
+            </q-item>
+            <q-item v-for="asset in analyzedAssets" :key="asset.path" class="q-py-md">
+              <q-item-section>
+                <q-item-label class="text-weight-medium">{{ asset.path }}</q-item-label>
+                <q-item-label caption>{{ asset.mime }}</q-item-label>
 
-                  <div v-if="isImageAsset(asset)" class="q-mt-md">
-                    <div class="row q-col-gutter-lg">
-                      <div class="col-12 col-sm-6">
-                        <div class="text-overline text-grey-7">Original</div>
-                        <div v-if="assetResolutions[asset.path]?.original" class="text-caption text-grey-6 q-mb-xs">
-                          {{ assetResolutions[asset.path]?.original }}px
-                        </div>
-                        <q-img
-                          :src="assetOriginalPreviewUrl(asset)"
-                          :alt="`original-${asset.path}`"
-                          fit="contain"
-                          class="rounded-borders bg-grey-2 shadow-1"
-                          style="width: 100%; height: 160px"
-                          @load="(src) => onOriginalImageLoad(asset.path, src)"
-                        >
-                          <template v-slot:error>
-                            <div class="absolute-full flex flex-center bg-negative text-white">
-                              Cannot load
-                            </div>
+                <div v-if="isImageAsset(asset)" class="q-mt-md">
+                  <div class="row q-col-gutter-lg">
+                    <div class="col-12 col-sm-6">
+                      <div class="text-overline text-grey-7">Original</div>
+                      <div v-if="assetResolutions[asset.path]?.original" class="text-caption text-grey-6 q-mb-xs">
+                        {{ assetResolutions[asset.path]?.original }}px
+                      </div>
+                      <q-img :src="assetOriginalPreviewUrl(asset)" :alt="`original-${asset.path}`" fit="contain"
+                        class="rounded-borders bg-grey-2 shadow-1" style="width: 100%; height: 160px"
+                        @load="(src) => onOriginalImageLoad(asset.path, src)">
+                        <template v-slot:error>
+                          <div class="absolute-full flex flex-center bg-negative text-white">
+                            Cannot load
+                          </div>
+                        </template>
+                      </q-img>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <div class="text-overline text-grey-7">Replacement</div>
+                      <div v-if="assetResolutions[asset.path]?.replacement" class="text-caption text-grey-6 q-mb-xs">
+                        {{ assetResolutions[asset.path]?.replacement }}px
+                      </div>
+                      <div v-if="hasReplacement(asset.path)" class="relative-position">
+                        <q-img :src="assetReplacementPreviewUrl(asset)" :alt="`replacement-${asset.path}`" fit="contain"
+                          class="rounded-borders bg-grey-2 shadow-1" style="width: 100%; height: 160px"
+                          @load="(src) => onReplacementImageLoad(asset.path, src)">
+                          <template v-slot:loading>
+                            <q-spinner-oval color="white" />
                           </template>
                         </q-img>
+                        <q-btn round dense color="negative" icon="delete" class="absolute-top-right q-ma-xs"
+                          @click="deleteReplacementAsset(asset)">
+                          <q-tooltip>Delete replacement</q-tooltip>
+                        </q-btn>
                       </div>
-                      <div class="col-12 col-sm-6">
-                        <div class="text-overline text-grey-7">Replacement</div>
-                        <div v-if="assetResolutions[asset.path]?.replacement" class="text-caption text-grey-6 q-mb-xs">
-                          {{ assetResolutions[asset.path]?.replacement }}px
-                        </div>
-                        <div v-if="hasReplacement(asset.path)" class="relative-position">
-                          <q-img
-                            :src="assetReplacementPreviewUrl(asset)"
-                            :alt="`replacement-${asset.path}`"
-                            fit="contain"
-                            class="rounded-borders bg-grey-2 shadow-1"
-                            style="width: 100%; height: 160px"
-                            @load="(src) => onReplacementImageLoad(asset.path, src)"
-                          >
-                            <template v-slot:loading>
-                              <q-spinner-oval color="white" />
-                            </template>
-                          </q-img>
-                          <q-btn
-                            round
-                            dense
-                            color="negative"
-                            icon="delete"
-                            class="absolute-top-right q-ma-xs"
-                            @click="deleteReplacementAsset(asset)"
-                          >
-                            <q-tooltip>Delete replacement</q-tooltip>
-                          </q-btn>
-                        </div>
-                        <div
-                          v-else
-                          class="flex items-center justify-center rounded-borders bg-grey-3 text-grey-6 border-dashed"
-                          style="width: 100%; height: 160px; border: 2px dashed #bdbdbd"
-                        >
-                          <q-icon name="add_photo_alternate" size="2em" />
-                          <div class="q-ml-sm">No replacement</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="row q-col-gutter-sm items-center q-mt-md">
-                      <div class="col">
-                        <q-file
-                          dense
-                          outlined
-                          accept="image/*"
-                          label="Choose replacement"
-                          :model-value="replacementFiles[asset.path] || null"
-                          @update:model-value="(file) => setReplacementFile(asset.path, file)"
-                        >
-                          <template v-slot:prepend>
-                            <q-icon name="attach_file" />
-                          </template>
-                        </q-file>
-                      </div>
-                      <div class="col-auto">
-                        <q-btn
-                          color="primary"
-                          icon="cloud_upload"
-                          label="Upload"
-                          unelevated
-                          :loading="uploadingAssetPath === asset.path"
-                          :disable="
-                            !replacementFiles[asset.path] || uploadingAssetPath === asset.path
-                          "
-                          @click="uploadReplacementAsset(asset)"
-                        />
+                      <div v-else
+                        class="flex items-center justify-center rounded-borders bg-grey-3 text-grey-6 border-dashed"
+                        style="width: 100%; height: 160px; border: 2px dashed #bdbdbd">
+                        <q-icon name="add_photo_alternate" size="2em" />
+                        <div class="q-ml-sm">No replacement</div>
                       </div>
                     </div>
                   </div>
-                </q-item-section>
-              </q-item>
+
+                  <div class="row q-col-gutter-sm items-center q-mt-md">
+                    <div class="col">
+                      <q-file dense outlined accept="image/*" label="Choose replacement"
+                        :model-value="replacementFiles[asset.path] || null"
+                        @update:model-value="(file) => setReplacementFile(asset.path, file)">
+                        <template v-slot:prepend>
+                          <q-icon name="attach_file" />
+                        </template>
+                      </q-file>
+                    </div>
+                    <div class="col-auto">
+                      <q-btn color="primary" icon="cloud_upload" label="Upload" unelevated
+                        :loading="uploadingAssetPath === asset.path" :disable="!replacementFiles[asset.path] || uploadingAssetPath === asset.path
+                          " @click="uploadReplacementAsset(asset)" />
+                    </div>
+                  </div>
+                </div>
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn
-            v-if="isEditMode"
-            flat
-            label="Save"
-            color="primary"
-            v-close-popup
-            @click="updateGame"
-          />
+          <q-btn v-if="isEditMode" flat label="Save" color="primary" v-close-popup @click="updateGame" />
           <q-btn v-else flat label="Add" color="green" :loading="isAddingGame" @click="addGame" />
         </q-card-actions>
       </q-card>
@@ -201,7 +135,7 @@
       <q-card class="w-120 q-pa-lg text-center">
         <q-card-section>
           <div class="text-h6 q-mb-md">Update Status</div>
-          
+
           <div v-if="workflowStatus !== 'completed'" class="flex flex-col items-center">
             <q-spinner-orbit color="primary" size="4em" class="q-mb-lg" />
             <div class="text-body1">
@@ -211,7 +145,7 @@
             <div class="text-caption text-grey-7 q-mt-md">
               Status: {{ workflowStatus || 'Initializing...' }}
             </div>
-            
+
             <div v-if="workflowProgress.total_steps > 0" class="w-full q-mt-lg">
               <div class="row justify-between items-center q-mb-xs">
                 <div class="text-caption text-weight-bold">
@@ -221,11 +155,8 @@
                   {{ Math.round((workflowProgress.completed_steps / workflowProgress.total_steps) * 100) }}%
                 </div>
               </div>
-              <q-linear-progress 
-                :value="workflowProgress.completed_steps / workflowProgress.total_steps" 
-                color="primary" 
-                class="q-mb-sm"
-              />
+              <q-linear-progress :value="workflowProgress.completed_steps / workflowProgress.total_steps"
+                color="primary" class="q-mb-sm" />
               <div class="text-caption text-grey-6 italic">
                 {{ workflowProgress.current_step }}
               </div>
@@ -252,13 +183,8 @@
         </q-card-section>
 
         <q-card-actions align="center" class="q-mt-md">
-          <q-btn
-            v-if="workflowStatus === 'completed'"
-            label="Close"
-            color="primary"
-            flat
-            @click="workflowModalOpen = false"
-          />
+          <q-btn v-if="workflowStatus === 'completed'" label="Close" color="primary" flat
+            @click="workflowModalOpen = false" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -270,6 +196,9 @@ import { ref, reactive, onUnmounted } from 'vue';
 import { useQuasar } from 'quasar';
 import GameCard from '../components/GameCard.vue';
 import { api } from 'boot/axios';
+import { useNotificationStore } from 'src/stores/notification';
+
+const notificationStore = useNotificationStore();
 
 interface Game {
   id: string;
@@ -394,10 +323,10 @@ function resetModal() {
 async function addGame() {
   const uploader = uploaderRef.value;
   if (!uploader || uploader.files.length === 0) {
-    $q.notify({ type: 'negative', message: 'Please select a ZIP file to upload.' });
+    notificationStore.notify({ type: 'negative', message: 'Please select a ZIP file to upload.' });
     return;
   }
-  
+
   isAddingGame.value = true;
   try {
     // Step 1: Create the game
@@ -414,7 +343,7 @@ async function addGame() {
     resetModal();
   } catch (err) {
     console.error(err);
-    $q.notify({ type: 'negative', message: 'Failed to add game.' });
+    notificationStore.notify({ type: 'negative', message: 'Failed to add game.' });
   } finally {
     isAddingGame.value = false;
   }
@@ -436,7 +365,7 @@ async function onEditGame(game: Game) {
     ]);
     analyzedAssets.value = assetsResponse.data.media_files ?? [];
   } catch {
-    $q.notify({ type: 'negative', message: 'Could not load analyzed assets.' });
+    notificationStore.notify({ type: 'negative', message: 'Could not load analyzed assets.' });
   } finally {
     loadingAnalyzedAssets.value = false;
   }
@@ -446,7 +375,7 @@ async function uploadReplacementAsset(asset: AnalyzedAsset) {
   if (!modalGame.id) return;
   const file = replacementFiles[asset.path];
   if (!file) {
-    $q.notify({ type: 'warning', message: 'Select a file first.' });
+    notificationStore.notify({ type: 'warning', message: 'Select a file first.' });
     return;
   }
 
@@ -462,9 +391,9 @@ async function uploadReplacementAsset(asset: AnalyzedAsset) {
 
     replacementPaths.value = new Set([...replacementPaths.value, asset.path]);
     replacementFiles[asset.path] = null;
-    $q.notify({ type: 'positive', message: 'Replacement uploaded.' });
+    notificationStore.notify({ type: 'positive', message: 'Replacement uploaded.' });
   } catch {
-    $q.notify({ type: 'negative', message: 'Could not upload replacement.' });
+    notificationStore.notify({ type: 'negative', message: 'Could not upload replacement.' });
   } finally {
     uploadingAssetPath.value = null;
   }
@@ -489,17 +418,17 @@ function deleteReplacementAsset(asset: AnalyzedAsset) {
         });
 
         replacementPaths.value.delete(asset.path);
-        // Trigger a re-render of the replacement preview if needed, 
+        // Trigger a re-render of the replacement preview if needed,
         // though replacementPaths update should be enough if we use it in v-if
-        $q.notify({ type: 'positive', message: 'Replacement deleted.' });
-        
+        notificationStore.notify({ type: 'positive', message: 'Replacement deleted.' });
+
         // Clear resolution
         const res = assetResolutions[asset.path];
         if (res) {
           delete res.replacement;
         }
       } catch {
-        $q.notify({ type: 'negative', message: 'Could not delete replacement.' });
+        notificationStore.notify({ type: 'negative', message: 'Could not delete replacement.' });
       }
     })();
   });
@@ -572,7 +501,7 @@ async function pollWorkflowStatus() {
   try {
     const response = await api.get('/trigger-build/workflow-status');
     const run = response.data;
-    
+
     // Ignore runs created before we clicked the button
     if (run.created_at) {
       const runCreated = new Date(run.created_at).getTime();
@@ -581,7 +510,7 @@ async function pollWorkflowStatus() {
       } else {
         workflowStatus.value = run.status;
         workflowConclusion.value = run.conclusion;
-        
+
         if (run.progress) {
           workflowProgress.total_steps = run.progress.total_steps;
           workflowProgress.completed_steps = run.progress.completed_steps;
@@ -601,10 +530,9 @@ async function pollWorkflowStatus() {
   } catch (err) {
     console.error('Error polling workflow status:', err);
     stopPolling();
-    $q.notify({
+    notificationStore.notify({
       type: 'negative',
       message: 'Failed to check update status. Please check your GitHub App permissions (Actions: Read-only).',
-      timeout: 10000
     });
     workflowModalOpen.value = false;
   }
@@ -617,20 +545,20 @@ async function updatePi() {
     workflowProgress.total_steps = 0;
     workflowProgress.completed_steps = 0;
     workflowProgress.current_step = '';
-    
+
     triggerTime = Date.now() - 10000; // Give some buffer for clock skew
     workflowModalOpen.value = true;
 
     await api.post('/trigger-build/trigger-workflow');
-    
+
     // Start polling
     stopPolling();
     await pollWorkflowStatus();
 
-    $q.notify({ type: 'positive', message: 'Pi update triggered.' });
+    notificationStore.notify({ type: 'positive', message: 'Pi update triggered.' });
   } catch (err) {
     console.error(err);
-    $q.notify({ type: 'negative', message: 'Failed to trigger update.' });
+    notificationStore.notify({ type: 'negative', message: 'Failed to trigger update.' });
     workflowModalOpen.value = false;
   }
 }
@@ -638,4 +566,10 @@ async function updatePi() {
 loadData().catch((err) => {
   console.error(err);
 });
+
+// Test notification on load
+// notificationStore.notify({
+//   type: 'info',
+//   message: 'Welcome to the Arcade Cabinet Management! This is a test notification.'
+// });
 </script>
