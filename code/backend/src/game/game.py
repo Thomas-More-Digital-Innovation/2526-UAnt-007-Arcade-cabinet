@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Query
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 import logging
@@ -176,6 +176,32 @@ def upload_asset(
     db.commit()
 
     return {"message": f"Asset {normalized_original_path} uploaded successfully", "asset_id": asset.id}
+
+
+@router.delete("/{game_id}/asset-override")
+def delete_asset_override(
+    game_id: UUID,
+    original_path: str = Query(...),
+    db: Session = Depends(database.get_session),
+):
+    game = db.get(database.Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    normalized_original_path = _normalize_virtual_path(original_path)
+    asset = db.query(database.Asset).filter_by(game_id=game_id, original_path=normalized_original_path).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset override not found")
+
+    try:
+        uploads_storage.delete_path(asset.path)
+    except Exception as e:
+        logger.error(f"Error deleting asset {asset.path} from S3: {e}")
+    
+    db.delete(asset)
+    db.commit()
+
+    return {"message": f"Asset override for {normalized_original_path} deleted successfully"}
 
 
 @router.get("/{game_id}/analyzed-assets")
