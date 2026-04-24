@@ -114,19 +114,30 @@
                         <div v-if="assetResolutions[asset.path]?.replacement" class="text-caption text-grey-6 q-mb-xs">
                           {{ assetResolutions[asset.path]?.replacement }}px
                         </div>
-                        <q-img
-                          v-if="hasReplacement(asset.path)"
-                          :src="assetReplacementPreviewUrl(asset)"
-                          :alt="`replacement-${asset.path}`"
-                          fit="contain"
-                          class="rounded-borders bg-grey-2 shadow-1"
-                          style="width: 100%; height: 160px"
-                          @load="(src) => onReplacementImageLoad(asset.path, src)"
-                        >
-                          <template v-slot:loading>
-                            <q-spinner-oval color="white" />
-                          </template>
-                        </q-img>
+                        <div v-if="hasReplacement(asset.path)" class="relative-position">
+                          <q-img
+                            :src="assetReplacementPreviewUrl(asset)"
+                            :alt="`replacement-${asset.path}`"
+                            fit="contain"
+                            class="rounded-borders bg-grey-2 shadow-1"
+                            style="width: 100%; height: 160px"
+                            @load="(src) => onReplacementImageLoad(asset.path, src)"
+                          >
+                            <template v-slot:loading>
+                              <q-spinner-oval color="white" />
+                            </template>
+                          </q-img>
+                          <q-btn
+                            round
+                            dense
+                            color="negative"
+                            icon="delete"
+                            class="absolute-top-right q-ma-xs"
+                            @click="deleteReplacementAsset(asset)"
+                          >
+                            <q-tooltip>Delete replacement</q-tooltip>
+                          </q-btn>
+                        </div>
                         <div
                           v-else
                           class="flex items-center justify-center rounded-borders bg-grey-3 text-grey-6 border-dashed"
@@ -457,6 +468,41 @@ async function uploadReplacementAsset(asset: AnalyzedAsset) {
   } finally {
     uploadingAssetPath.value = null;
   }
+}
+
+function deleteReplacementAsset(asset: AnalyzedAsset) {
+  if (!modalGame.id) return;
+
+  $q.dialog({
+    title: 'Confirm deletion',
+    message: `Are you sure you want to delete the replacement for ${asset.path}?`,
+    cancel: true,
+    ok: {
+      label: 'Delete',
+      color: 'negative',
+    },
+  }).onOk(() => {
+    void (async () => {
+      try {
+        await api.delete(`/games/${modalGame.id}/asset-override`, {
+          params: { original_path: asset.path },
+        });
+
+        replacementPaths.value.delete(asset.path);
+        // Trigger a re-render of the replacement preview if needed, 
+        // though replacementPaths update should be enough if we use it in v-if
+        $q.notify({ type: 'positive', message: 'Replacement deleted.' });
+        
+        // Clear resolution
+        const res = assetResolutions[asset.path];
+        if (res) {
+          delete res.replacement;
+        }
+      } catch {
+        $q.notify({ type: 'negative', message: 'Could not delete replacement.' });
+      }
+    })();
+  });
 }
 
 async function updateGame() {
