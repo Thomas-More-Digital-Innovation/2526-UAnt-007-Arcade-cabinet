@@ -46,50 +46,76 @@
 
     nixosModules = nixos-raspberrypi.nixosModules // {
       docker = { config, lib, pkgs, ... }: {
-        # Enable Docker for running the static web server
+        # Docker is enabled, but we manage the container manually in the kiosk service
         virtualisation.docker.enable = true;
 
-        # Run the arcade static container
-        virtualisation.oci-containers = {
-          backend = "docker";
-          containers.arcade-static = {
-            image = "ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest";
-            ports = [ "80:80" ];
-          };
-        };
-
-        # Configure the browser to open the web server in kiosk mode
-        # We use a systemd user service for Chromium to make it robust (auto-restart)
-        systemd.user.services.chromium-kiosk = {
-          description = "Chromium Kiosk Service";
-          wantedBy = [ "graphical-session.target" ];
-          partOf = [ "graphical-session.target" ];
-          script = ''
-            # Wait for the static web server to be ready (Docker container)
-            while ! ${pkgs.curl}/bin/curl -s -o /dev/null -f http://localhost; do
-              ${pkgs.coreutils}/bin/sleep 2
-            done
-
-            # Clear any stale locks that might prevent starting after a crash
-            # Specifically handles cases where hostname changes (e.g. nixos -> ArcadeKast-UANT)
-            rm -f $HOME/.config/chromium/SingletonLock
-
-            exec ${pkgs.ungoogled-chromium}/bin/chromium \
-              --no-first-run \
-              --no-default-browser-check \
-              --kiosk \
-              --start-maximized \
-              --disable-infobars \
-              --password-store=basic \
-              --noerrdialogs \
-              --disable-session-crashed-bubble \
-              "http://localhost"
-          '';
+        # Consolidated Kiosk Service: Manages Docker container and starts Chromium
+        systemd.services.kiosk = {
+          description = "Arcade Kiosk (Docker & Browser)";
+          after = [ "network-online.target" "docker.service" "display-manager.service" ];
+          wants = [ "network-online.target" "docker.service" ];
           serviceConfig = {
+            Type = "simple";
+            User = "pi";
+            Group = "users";
+            # Chromium needs a DISPLAY and an XAUTHORITY
+            Environment = [
+              "DISPLAY=:0"
+              "XAUTHORITY=/home/pi/.Xauthority"
+            ];
+            ExecStart = pkgs.writeShellScript "kiosk-session" ''
+              # 1. Wait up to 30 seconds for an internet connection and pull image
+              PULLED=false
+              echo "Waiting for internet connection (up to 30s)..."
+              for i in {1..30}; do
+                if ${pkgs.iputils}/bin/ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then
+                  echo "Internet detected, checking for image updates..."
+                  if ${pkgs.docker}/bin/docker pull ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest; then
+                    PULLED=true
+                  fi
+                  break
+                fi
+                ${pkgs.coreutils}/bin/sleep 1
+              done
+
+              # 2. Manage the Docker container
+              # Restart the container if we pulled a new image or if it's not running
+              CONTAINER_RUNNING=$(${pkgs.docker}/bin/docker ps -q -f name=arcade-static)
+              if [ "$PULLED" = "true" ] || [ -z "$CONTAINER_RUNNING" ]; then
+                echo "Starting/Restarting Docker container..."
+                ${pkgs.docker}/bin/docker stop arcade-static || true
+                ${pkgs.docker}/bin/docker rm arcade-static || true
+                ${pkgs.docker}/bin/docker run -d \
+                  --name arcade-static \
+                  -p 80:80 \
+                  ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest
+              fi
+
+              # 3. Wait for the web server to be responsive
+              echo "Waiting for web server to be responsive..."
+              while ! ${pkgs.curl}/bin/curl -s -o /dev/null -f http://localhost; do
+                ${pkgs.coreutils}/bin/sleep 2
+              done
+
+              # 4. Clear any stale Chromium locks
+              rm -f /home/pi/.config/chromium/SingletonLock
+
+              # 5. Launch Chromium in Kiosk mode
+              echo "Launching Chromium..."
+              exec ${pkgs.ungoogled-chromium}/bin/chromium \
+                --no-first-run \
+                --no-default-browser-check \
+                --kiosk \
+                --start-maximized \
+                --disable-infobars \
+                --password-store=basic \
+                --noerrdialogs \
+                --disable-session-crashed-bubble \
+                "http://localhost"
+            '';
+            ExecStopPost = "${pkgs.docker}/bin/docker stop arcade-static || true";
             Restart = "always";
-            RestartSec = 3;
-            # Ensure we have a valid DISPLAY
-            Environment = "DISPLAY=:0";
+            RestartSec = 10;
           };
         };
 
@@ -103,25 +129,34 @@
           # Hide mouse cursor when inactive
           ${pkgs.unclutter-xfixes}/bin/unclutter --timeout 1 &
 
-          # Trigger the user service (systemd will handle the rest)
-          ${pkgs.systemd}/bin/systemctl --user start chromium-kiosk &
+          # Trigger the consolidated kiosk service
+          # We use sudo because it's a system service; NOPASSWD rule is added below
+          sudo ${pkgs.systemd}/bin/systemctl restart kiosk &
         '';
 
-        # Ensure the user 'pi' can interact with docker if needed
-        users.users.pi.extraGroups = [ "docker" ];
+        # Allow the 'pi' user to manage the kiosk service without a password
+        security.sudo.extraRules = [
+          {
+            users = [ "pi" ];
+            commands = [
+              {
+                command = "${pkgs.systemd}/bin/systemctl start kiosk";
+                options = [ "NOPASSWD" ];
+              }
+              {
+                command = "${pkgs.systemd}/bin/systemctl stop kiosk";
+                options = [ "NOPASSWD" ];
+              }
+              {
+                command = "${pkgs.systemd}/bin/systemctl restart kiosk";
+                options = [ "NOPASSWD" ];
+              }
+            ];
+          }
+        ];
 
-        # Always pull the latest image on startup if online
-        systemd.services.docker-arcade-static = {
-          preStart = lib.mkBefore ''
-            # Check for internet connectivity (ping 8.8.8.8)
-            if ${pkgs.iputils}/bin/ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
-              echo "Internet detected, pulling latest arcade image..."
-              ${pkgs.docker}/bin/docker pull ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest || true
-            else
-              echo "No internet connection, skipping image pull."
-            fi
-          '';
-        };
+        # Ensure the user 'pi' can interact with docker
+        users.users.pi.extraGroups = [ "docker" ];
       };
 
       immutable = { config, lib, pkgs, ... }: {
