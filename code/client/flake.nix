@@ -107,27 +107,31 @@
               ${pkgs.coreutils}/bin/sleep 2
             done
 
-            # 4. Clear locks
-            rm -f /home/pi/.config/chromium/SingletonLock
+            # 4. Launch Chromium in a loop
+            while true; do
+              # Clear locks
+              rm -f /home/pi/.config/chromium/SingletonLock
 
-            # 5. Launch Chromium
-            exec ${pkgs.ungoogled-chromium}/bin/chromium \
-              --ozone-platform=wayland \
-              --ignore-gpu-blocklist \
-              --enable-gpu-rasterization \
-              --enable-zero-copy \
-              --no-first-run \
-              --no-default-browser-check \
-              --kiosk \
-              --start-maximized \
-              --disable-infobars \
-              --password-store=basic \
-              --noerrdialogs \
-              --disable-session-crashed-bubble \
-              --disable-cache \
-              --disk-cache-size=1 \
-              --media-cache-size=1 \
-              --app="http://localhost"
+              ${pkgs.ungoogled-chromium}/bin/chromium \
+                --ozone-platform=wayland \
+                --ignore-gpu-blocklist \
+                --enable-gpu-rasterization \
+                --enable-zero-copy \
+                --no-first-run \
+                --no-default-browser-check \
+                --kiosk \
+                --start-maximized \
+                --disable-infobars \
+                --password-store=basic \
+                --noerrdialogs \
+                --disable-session-crashed-bubble \
+                --disable-cache \
+                --disk-cache-size=1 \
+                --media-cache-size=1 \
+                --app="http://localhost"
+              
+              ${pkgs.coreutils}/bin/sleep 1
+            done
           ''}
         '';
 
