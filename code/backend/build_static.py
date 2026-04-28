@@ -195,6 +195,7 @@ class StaticBuildOrchestrator:
                 game_metadata.append({
                     "id": game_id,
                     "name": name,
+                    "description": game.get('description', ''),
                     "index_rel": index_rel,
                     "wrapper_url": f"games/{game_id}/game.html"
                 })
@@ -279,22 +280,25 @@ class StaticBuildOrchestrator:
                 except Exception as e:
                     logger.debug(f"Checked {cand} - Error: {e}")
             
-            if not found_s3_path:
-                logger.error(f"Could not find S3 directory for game {game_name} ({game_id})")
-                continue
-            
-            # Download game content
             local_game_dir = self.games_dir / game_id
-            try:
-                self.download_s3_dir(found_s3_path, local_game_dir)
-                
-                # Flatten the directory structure to handle absolute asset paths
-                self.flatten_directory(local_game_dir)
-                
-                # Apply asset overrides
-                self.apply_overrides(game_id, local_game_dir)
-            except Exception as e:
-                logger.error(f"Failed to process game {game_name}: {e}")
+            if not found_s3_path:
+                if local_game_dir.exists() and any(local_game_dir.iterdir()):
+                    logger.info(f"Using existing local directory for game {game_name}")
+                else:
+                    logger.error(f"Could not find S3 directory for game {game_name} ({game_id})")
+                    continue
+            else:
+                # Download game content
+                try:
+                    self.download_s3_dir(found_s3_path, local_game_dir)
+                    
+                    # Flatten the directory structure to handle absolute asset paths
+                    self.flatten_directory(local_game_dir)
+                    
+                    # Apply asset overrides
+                    self.apply_overrides(game_id, local_game_dir)
+                except Exception as e:
+                    logger.error(f"Failed to process game {game_name}: {e}")
 
         # Generate the main selection screen from the new template
         self.generate_selection_screen()

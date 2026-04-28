@@ -37,6 +37,7 @@ def serialize_game(game):
     return {
         "id": str(game.id),
         "name": game.name,
+        "description": game.description,
         "zip_uploads": [
             {
                 "id": str(zu.id),

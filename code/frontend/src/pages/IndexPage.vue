@@ -35,6 +35,8 @@
         </q-card-section>
         <q-card-section class="flex flex-col gap-4">
           <q-input v-model="modalGame.name" type="text" label="Game Name" />
+          <q-input v-model="modalGame.description" type="textarea" label="Game Description (Story/Explanation)" autogrow
+            hint="This will be shown on the start screen before the game launches." />
           <!-- Show uploader only in add mode -->
           <q-uploader v-if="!isEditMode" ref="uploaderRef" accept=".zip" label="Upload ZIP folder" field-name="file"
             :auto-upload="false" :hide-upload-btn="true" />
@@ -203,6 +205,7 @@ const notificationStore = useNotificationStore();
 interface Game {
   id: string;
   name: string;
+  description?: string;
 }
 
 interface AnalyzedAsset {
@@ -217,7 +220,7 @@ const isLoading = ref(true);
 const data = reactive<Game[]>([]);
 const confirm = ref(false);
 const isEditMode = ref(false);
-const modalGame = reactive<{ id: string | undefined; name: string }>({ id: undefined, name: '' });
+const modalGame = reactive<{ id: string | undefined; name: string; description: string }>({ id: undefined, name: '', description: '' });
 const analyzedAssets = ref<AnalyzedAsset[]>([]);
 const loadingAnalyzedAssets = ref(false);
 const replacementPaths = ref<Set<string>>(new Set());
@@ -310,6 +313,7 @@ function resetModal() {
   isEditMode.value = false;
   modalGame.id = undefined;
   modalGame.name = '';
+  modalGame.description = '';
   analyzedAssets.value = [];
   loadingAnalyzedAssets.value = false;
   replacementPaths.value = new Set();
@@ -330,7 +334,7 @@ async function addGame() {
   isAddingGame.value = true;
   try {
     // Step 1: Create the game
-    const gameResp = await api.post('/games', { name: modalGame.name });
+    const gameResp = await api.post('/games', { name: modalGame.name, description: modalGame.description });
     const newGame = gameResp.data.game;
     // Step 2: Upload the ZIP file
     const formData = new FormData();
@@ -352,6 +356,7 @@ async function addGame() {
 async function onEditGame(game: Game) {
   modalGame.id = game.id;
   modalGame.name = game.name;
+  modalGame.description = game.description || '';
   isEditMode.value = true;
   confirm.value = true;
   Object.keys(assetResolutions).forEach(k => delete assetResolutions[k]);
@@ -439,6 +444,7 @@ async function updateGame() {
     const response = await api.put(`/games/${modalGame.id}`, {
       id: modalGame.id,
       name: modalGame.name,
+      description: modalGame.description,
     });
 
     const updatedGame = response.data.game;

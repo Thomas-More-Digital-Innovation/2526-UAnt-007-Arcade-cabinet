@@ -13,6 +13,19 @@
         <!-- Games will be injected by JS -->
     </div>
 
+    <!-- Start screen / Description overlay -->
+    <div id="descriptionOverlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h2 id="overlayGameTitle">Game Title</h2>
+            <div id="overlayGameDescription" class="description-text">
+                Game story and explanation go here...
+            </div>
+            <div class="overlay-footer">
+                Press START to Play
+            </div>
+        </div>
+    </div>
+
     <!-- Data injected by the build script -->
     <script id="game-data" type="application/json">
         {{GAMES_JSON}}
