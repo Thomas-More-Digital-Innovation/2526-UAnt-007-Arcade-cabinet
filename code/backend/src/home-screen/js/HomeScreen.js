@@ -15,7 +15,12 @@ try {
 
 function showHomeScreen() {
     const homeScreenMenu = document.querySelector('.menu');
-    const homeScreenTitle = document.getElementById("projectTitle");
+    const descriptionOverlay = document.getElementById('descriptionOverlay');
+    const overlayTitle = document.getElementById('overlayGameTitle');
+    const overlayDescription = document.getElementById('overlayGameDescription');
+
+    let isOverlayOpen = false;
+    let selectedIndex = 0;
 
     homeScreenMenu.innerHTML = ''; // Clear menu
 
@@ -29,15 +34,18 @@ function showHomeScreen() {
         gameOption.className = 'game-option';
         
         const link = document.createElement('a');
-        // Point to the wrapper or fallback to raw index
         link.href = game.wrapper_url || `games/${game.id}/${game.index_rel}`;
         link.textContent = game.name;
+        // Don't navigate automatically on click if we want to show description
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            openDescription(index);
+        });
         
         gameOption.appendChild(link);
         homeScreenMenu.appendChild(gameOption);
     });
 
-    let selectedIndex = 0;
     const gameOptions = document.querySelectorAll('.game-option');
     
     function updateSelection() {
@@ -50,9 +58,37 @@ function showHomeScreen() {
         });
     }
 
+    function openDescription(index) {
+        const game = arcadeGames[index];
+        overlayTitle.textContent = game.name;
+        overlayDescription.textContent = game.description || "No description available for this game.";
+        descriptionOverlay.classList.remove('hidden');
+        isOverlayOpen = true;
+    }
+
+    function closeDescription() {
+        descriptionOverlay.classList.add('hidden');
+        isOverlayOpen = false;
+    }
+
+    function launchGame(index) {
+        const game = arcadeGames[index];
+        const url = game.wrapper_url || `games/${game.id}/${game.index_rel}`;
+        window.location.href = url;
+    }
+
     updateSelection();
 
     document.addEventListener('keydown', (event) => {
+        if (isOverlayOpen) {
+            if (event.key === 'Enter') {
+                launchGame(selectedIndex);
+            } else if (event.key === 'Escape' || event.key === 'Backspace' || event.key === 'ArrowLeft') {
+                closeDescription();
+            }
+            return;
+        }
+
         if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
             selectedIndex = (selectedIndex + 1) % gameOptions.length;
             updateSelection();
@@ -60,8 +96,7 @@ function showHomeScreen() {
             selectedIndex = (selectedIndex - 1 + gameOptions.length) % gameOptions.length;
             updateSelection();
         } else if (event.key === 'Enter') {
-            const link = gameOptions[selectedIndex].querySelector('a');
-            if (link) window.location.href = link.href;
+            openDescription(selectedIndex);
         }
     });
 }

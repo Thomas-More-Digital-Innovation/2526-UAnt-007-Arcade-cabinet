@@ -41,17 +41,19 @@ def get_all_games(db: Session = Depends(database.get_session)):
 # Pydantic model for game creation
 class GameCreateRequest(BaseModel):
     name: str
+    description: str | None = None
 
 @router.post("/")
 def create_game(request: GameCreateRequest, db: Session = Depends(database.get_session)):
-    new_game = database.Game(name=request.name)
+    new_game = database.Game(name=request.name, description=request.description)
     db.add(new_game)
     db.commit()
-    return {"game": {"id": new_game.id, "name": new_game.name}}
+    return {"game": {"id": new_game.id, "name": new_game.name, "description": new_game.description}}
 
 class GamePutRequest(BaseModel):
     id: UUID
     name: str
+    description: str | None = None
 
 @router.put("/{game_id}")
 def update_game(game_id: UUID, request: GamePutRequest, db: Session = Depends(database.get_session)):
@@ -59,8 +61,9 @@ def update_game(game_id: UUID, request: GamePutRequest, db: Session = Depends(da
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     game.name = request.name
+    game.description = request.description
     db.commit()
-    return {"game": {"id": game.id, "name": game.name}}
+    return {"game": {"id": game.id, "name": game.name, "description": game.description}}
 
 @router.delete("/{game_id}")
 def delete_game(game_id: UUID, db: Session = Depends(database.get_session)):

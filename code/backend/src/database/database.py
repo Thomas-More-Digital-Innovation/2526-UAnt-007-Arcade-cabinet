@@ -35,10 +35,11 @@ class Game(Base):
     __tablename__ = "game"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     zip_uploads: Mapped[List["ZipUpload"]] = relationship(back_populates="game")
     assets: Mapped[List["Asset"]] = relationship(back_populates="game")
     def __repr__(self) -> str:
-        return f"Game(id={self.id!r}, name={self.name!r})"
+        return f"Game(id={self.id!r}, name={self.name!r}, description={self.description!r})"
 
 class ZipUpload(Base):
     __tablename__ = "zip_upload"
