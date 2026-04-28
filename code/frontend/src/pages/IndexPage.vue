@@ -58,8 +58,8 @@
             </q-item>
             <q-item v-for="asset in analyzedAssets" :key="asset.path" class="q-py-md">
               <q-item-section>
-                <q-item-label class="text-weight-medium">{{ asset.path }}</q-item-label>
-                <q-item-label caption>{{ asset.mime }}</q-item-label>
+                <q-item-label class="text-weight-medium">{{ asset.path.split('/').pop() }}</q-item-label>
+                <q-item-label caption>{{ asset.path }} • {{ asset.mime }}</q-item-label>
 
                 <div v-if="isImageAsset(asset)" class="q-mt-md">
                   <div class="row q-col-gutter-lg">

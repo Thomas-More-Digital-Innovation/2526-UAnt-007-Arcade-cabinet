@@ -238,6 +238,9 @@ def get_analyzed_assets(game_id: UUID, db: Session = Depends(database.get_sessio
     media_files = []
 
     game_root_prefix = game_root_dir.rstrip('/') + '/'
+    if game_root_prefix.startswith('s3://'):
+        game_root_prefix = game_root_prefix[len('s3://'):]
+
     for file_uri in uploads_storage.walk_files(game_root_dir):
         mime = uploads_storage.guess_content_type(file_uri)
         if not mime or not (mime.startswith('image/') or mime.startswith('audio/')):
