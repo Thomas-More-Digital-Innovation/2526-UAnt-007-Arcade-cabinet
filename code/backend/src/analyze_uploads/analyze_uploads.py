@@ -3,13 +3,13 @@ from storage.uploads_storage import uploads_storage
 
 router = APIRouter()
 
-@router.get("/analyze-zip-uploads")
+@router.get('/analyze-zip-uploads')
 def analyze_zip_uploads():
     found_media = []
 
     for filename in get_uploaded_files():
         extracted_dir = uploads_storage.extracted_root_uri(filename)
-        prefix = extracted_dir.rstrip("/") + "/"
+        prefix = extracted_dir.rstrip('/') + '/'
 
         if not uploads_storage.prefix_has_files(extracted_dir):
             continue

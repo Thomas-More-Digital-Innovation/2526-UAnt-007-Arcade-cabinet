@@ -30,119 +30,119 @@ def get_github_client():
         _github_client_expiry = time.time() + 1800 # 30 minutes
         return _github_client
     except Exception as e:
-        logger.error(f"Failed to initialize GitHub client: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"GitHub initialization failed: {str(e)}")
+        logger.error(f'Failed to initialize GitHub client: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'GitHub initialization failed: {str(e)}')
 
 def serialize_game(game):
     return {
-        "id": str(game.id),
-        "name": game.name,
-        "description": game.description,
-        "zip_uploads": [
+        'id': str(game.id),
+        'name': game.name,
+        'description': game.description,
+        'zip_uploads': [
             {
-                "id": str(zu.id),
-                "name": zu.name,
-                "game_id": str(zu.game_id)
+                'id': str(zu.id),
+                'name': zu.name,
+                'game_id': str(zu.game_id)
             } for zu in game.zip_uploads
         ],
-        "assets": [
+        'assets': [
             {
-                "id": str(asset.id),
-                "game_id": str(asset.game_id),
-                "original_path": asset.original_path,
-                "path": asset.path
+                'id': str(asset.id),
+                'game_id': str(asset.game_id),
+                'original_path': asset.original_path,
+                'path': asset.path
             } for asset in game.assets
         ]
     }
 
 def serialize_zip_upload(zu):
     return {
-        "id": str(zu.id),
-        "name": zu.name,
-        "game_id": str(zu.game_id)
+        'id': str(zu.id),
+        'name': zu.name,
+        'game_id': str(zu.game_id)
     }
 
 def serialize_asset(asset):
     return {
-        "id": str(asset.id),
-        "game_id": str(asset.game_id),
-        "original_path": asset.original_path,
-        "path": asset.path
+        'id': str(asset.id),
+        'game_id': str(asset.game_id),
+        'original_path': asset.original_path,
+        'path': asset.path
     }
 
-@router.post("/trigger-workflow")
+@router.post('/trigger-workflow')
 async def trigger_workflow(db: Session = Depends(database.get_session)):
     if not all([config.github_app_id, config.github_private_key_path, config.github_installation_id, config.github_repo_owner, config.github_repo_name]):
-        raise HTTPException(status_code=500, detail="GitHub App configuration is missing")
+        raise HTTPException(status_code=500, detail='GitHub App configuration is missing')
     
     games = db.query(database.Game).all()
     zip_uploads = db.query(database.ZipUpload).all()
     assets = db.query(database.Asset).all()
 
     db_dump = {
-        "games": [serialize_game(game) for game in games],
-        "zip_uploads": [serialize_zip_upload(zu) for zu in zip_uploads],
-        "assets": [serialize_asset(asset) for asset in assets]
+        'games': [serialize_game(game) for game in games],
+        'zip_uploads': [serialize_zip_upload(zu) for zu in zip_uploads],
+        'assets': [serialize_asset(asset) for asset in assets]
     }
 
     try:
         g = get_github_client()
-        repo_name = f"{config.github_repo_owner}/{config.github_repo_name}"
+        repo_name = f'{config.github_repo_owner}/{config.github_repo_name}'
         repo = g.get_repo(repo_name)
         
         repo.create_repository_dispatch(
-            event_type="trigger",
+            event_type='trigger',
             client_payload=db_dump
         )
         
     except Exception as e:
-        logger.error(f"Failed to trigger workflow: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to trigger workflow: {str(e)}")
+        logger.error(f'Failed to trigger workflow: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'Failed to trigger workflow: {str(e)}')
         
-    return {"message": "Workflow triggered successfully"}
+    return {'message': 'Workflow triggered successfully'}
 
-@router.get("/workflow-status")
+@router.get('/workflow-status')
 async def get_workflow_status():
     if not all([config.github_app_id, config.github_private_key_path, config.github_installation_id, config.github_repo_owner, config.github_repo_name]):
-        raise HTTPException(status_code=500, detail="GitHub App configuration is missing")
+        raise HTTPException(status_code=500, detail='GitHub App configuration is missing')
     
     try:
         g = get_github_client()
-        repo_name = f"{config.github_repo_owner}/{config.github_repo_name}"
+        repo_name = f'{config.github_repo_owner}/{config.github_repo_name}'
         repo = g.get_repo(repo_name)
         
         # Get the latest workflow run for repository_dispatch
-        runs = repo.get_workflow_runs(event="repository_dispatch")
+        runs = repo.get_workflow_runs(event='repository_dispatch')
         
         if runs.totalCount == 0:
-            return {"status": "none", "conclusion": None}
+            return {'status': 'none', 'conclusion': None}
             
         latest_run = runs[0]
         
         # Fetch jobs to get step progress
         jobs = None
         try:
-            if hasattr(latest_run, "get_jobs"):
+            if hasattr(latest_run, 'get_jobs'):
                 jobs = latest_run.get_jobs()
-            elif hasattr(latest_run, "jobs"):
+            elif hasattr(latest_run, 'jobs'):
                 jobs = latest_run.jobs()
             else:
                 logger.error(f"WorkflowRun object has neither get_jobs nor jobs. Available: {[a for a in dir(latest_run) if not a.startswith('_')]}")
         except Exception as e:
-            logger.error(f"Error calling jobs method: {str(e)}")
+            logger.error(f'Error calling jobs method: {str(e)}')
 
         total_steps = 0
         completed_steps = 0
-        current_step_name = ""
+        current_step_name = ''
         
         if jobs and jobs.totalCount > 0:
             # Usually there is only one main job for these workflows
             job = jobs[0]
             total_steps = len(job.steps)
             for step in job.steps:
-                if step.status == "completed":
+                if step.status == 'completed':
                     completed_steps += 1
-                elif step.status == "in_progress":
+                elif step.status == 'in_progress':
                     current_step_name = step.name
             
             # If nothing is in_progress but we have completed some, the next one is current
@@ -150,18 +150,18 @@ async def get_workflow_status():
                 current_step_name = job.steps[completed_steps].name
 
         return {
-            "id": latest_run.id,
-            "status": latest_run.status,
-            "conclusion": latest_run.conclusion,
-            "created_at": latest_run.created_at.isoformat() if latest_run.created_at else None,
-            "updated_at": latest_run.updated_at.isoformat() if latest_run.updated_at else None,
-            "progress": {
-                "total_steps": total_steps,
-                "completed_steps": completed_steps,
-                "current_step": current_step_name
+            'id': latest_run.id,
+            'status': latest_run.status,
+            'conclusion': latest_run.conclusion,
+            'created_at': latest_run.created_at.isoformat() if latest_run.created_at else None,
+            'updated_at': latest_run.updated_at.isoformat() if latest_run.updated_at else None,
+            'progress': {
+                'total_steps': total_steps,
+                'completed_steps': completed_steps,
+                'current_step': current_step_name
             }
         }
         
     except Exception as e:
-        logger.error(f"Failed to fetch workflow status: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch workflow status: {str(e)}")
+        logger.error(f'Failed to fetch workflow status: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'Failed to fetch workflow status: {str(e)}')
