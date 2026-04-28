@@ -97,10 +97,17 @@
               --ignore-gpu-blocklist \
               --enable-gpu-rasterization \
               --enable-zero-copy \
-              --enable-features=Vulkan \
               --no-first-run \
               --no-default-browser-check \
               --kiosk \
+              --start-maximized \
+              --disable-infobars \
+              --password-store=basic \
+              --noerrdialogs \
+              --disable-session-crashed-bubble \
+              --disable-cache \
+              --disk-cache-size=1 \
+              --media-cache-size=1 \
               "http://localhost"
           ''}";
         };
