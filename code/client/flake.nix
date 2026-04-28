@@ -270,10 +270,6 @@
 
 
         services.udev.extraHwdb = ''
-          # Match by ID (using uppercase as reported by kernel modalias)
-          evdev:input:b0003vD209p0420*
-            KEYBOARD_KEY_700e0=enter
-
           # Match by name
           evdev:name:Ultimarc I-PAC 2:*
             KEYBOARD_KEY_700e0=enter
