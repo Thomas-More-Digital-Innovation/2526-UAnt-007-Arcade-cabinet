@@ -92,7 +92,7 @@
 
             # 5. Launch Chromium in Kiosk mode via Wayland
             echo "Launching Chromium with GPU acceleration..."
-            exec ${pkgs.chromium}/bin/chromium \
+            exec ${pkgs.ungoogled-chromium}/bin/chromium \
               --ozone-platform=wayland \
               --ignore-gpu-blocklist \
               --enable-gpu-rasterization \
@@ -108,7 +108,7 @@
               --disable-cache \
               --disk-cache-size=1 \
               --media-cache-size=1 \
-              "http://localhost"
+              --app="http://localhost"
           ''}";
         };
 
@@ -257,7 +257,7 @@
           htop
           btop
           fastfetch
-          chromium
+          ungoogled-chromium
           dnsutils
           xorg.xset
           input-remapper
