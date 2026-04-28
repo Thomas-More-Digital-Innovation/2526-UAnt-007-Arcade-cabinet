@@ -6,15 +6,15 @@ _app_dir = Path(__file__).resolve().parent
 _src_dir = _app_dir.parent
 _backend_dir = _src_dir.parent
 
-dotenv.load_dotenv(_backend_dir / ".env")
-dotenv.load_dotenv(_src_dir / ".env")
+dotenv.load_dotenv(_backend_dir / '.env')
+dotenv.load_dotenv(_src_dir / '.env')
 
 from config import config
 import logging
 
 logging.basicConfig(
     level=config.log_level,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 from fastapi import FastAPI, HTTPException, Security, Depends, Response, Cookie, Query, Request
@@ -28,49 +28,58 @@ from trigger_build.trigger_build import router as trigger_build_router
 
 logger = logging.getLogger(__name__)
 
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+api_key_header = APIKeyHeader(name='X-API-Key', auto_error=False)
 
 async def get_api_key(
     request: Request,
     response: Response,
     api_key_header: str = Security(api_key_header),
-    api_key_query: str = Query(None, alias="api_key"),
-    api_key_cookie: str = Cookie(None, alias="api_key")
+    api_key_query: str = Query(None, alias='api_key'),
+    api_key_cookie: str = Cookie(None, alias='api_key')
 ):
     if not config.api_key:
         return None # Dev mode or not configured
     
+    # Always set Referrer-Policy to ensure sub-resources can send the full URL in the referer.
+    # This is critical for iframes where the API key is in the query string.
+    response.headers['Referrer-Policy'] = 'no-referrer-when-downgrade'
+
     # Primary check: direct credentials
     key = api_key_header or api_key_query or api_key_cookie
     
-    # Fallback check: Referer header (helpful for sub-resources in iframes where cookies are blocked)
+    # Fallback check: Referer header
     if not key:
-        referer = request.headers.get("referer")
-        if referer and f"api_key={config.api_key}" in referer:
-            key = config.api_key
+        referer = request.headers.get('referer')
+        if referer:
+            # Case 1: API key is explicitly in the referer query string
+            if f'api_key={config.api_key}' in referer:
+                key = config.api_key
+            # Case 2: Referer is from our own backend origin (e.g. sub-resources of a validly loaded page)
+            elif referer.startswith(str(request.base_url)):
+                 key = config.api_key
 
     if key == config.api_key:
         if not api_key_cookie:
-            is_https = request.url.scheme == "https"
+            is_https = request.url.scheme == 'https'
             response.set_cookie(
-                key="api_key",
+                key='api_key',
                 value=key,
                 httponly=True,
-                samesite="none" if is_https else "lax",
+                samesite='none' if is_https else 'lax',
                 secure=is_https,
-                path="/"
+                path='/'
             )
         return key
         
     raise HTTPException(
         status_code=403,
-        detail="Could not validate credentials",
+        detail='Could not validate credentials',
     )
 
 app = FastAPI(dependencies=[Depends(get_api_key)])
 
 origins = [
-    "http://localhost:9000",
+    'http://localhost:9000',
     'https://ua-manage-arcade.digitalinnovation.be'
 ]
 
@@ -78,19 +87,19 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 
-app.include_router(game_router, prefix="/games", tags=["games"])
+app.include_router(game_router, prefix='/games', tags=['games'])
 # app.include_router(assets_router, prefix="/assets", tags=["assets"])
 
 app.include_router(analyze_uploads_router)
-app.include_router(file_uploads_router, prefix="/file-uploads", tags=["assets"])
-app.include_router(trigger_build_router, prefix="/trigger-build", tags=["trigger-build"])
+app.include_router(file_uploads_router, prefix='/file-uploads', tags=['assets'])
+app.include_router(trigger_build_router, prefix='/trigger-build', tags=['trigger-build'])
 
-@app.get("/")
+@app.get('/')
 async def root():   
-    logger.info("Root endpoint accessed")
-    return {"message": "Hello World"}
+    logger.info('Root endpoint accessed')
+    return {'message': 'Hello World'}
