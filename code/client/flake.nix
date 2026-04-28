@@ -69,6 +69,9 @@
             xkb_layout be
           }
 
+          # Remap Arcade Tab button to close the focused window
+          bindsym Tab kill
+
           # Disable window decorations
           default_border none
           default_floating_border none
@@ -260,12 +263,11 @@
           ungoogled-chromium
           dnsutils
           xorg.xset
-          input-remapper
           evtest
           unclutter-xfixes
         ];
 
-        services.input-remapper.enable = true;
+
 
         boot.kernelParams = [ "consoleblank=0" ];
 
