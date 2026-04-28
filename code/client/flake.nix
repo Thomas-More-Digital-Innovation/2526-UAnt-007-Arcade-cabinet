@@ -51,7 +51,7 @@
 
         # Consolidated Kiosk Service: Manages Docker container and starts Chromium via Sway (Wayland)
         # We use Sway instead of Cage because Sway supports native cursor autohiding.
-        services.sway = {
+        programs.sway = {
           enable = true;
           package = pkgs.sway;
           extraOptions = [ "--unsupported-gpu" ];
