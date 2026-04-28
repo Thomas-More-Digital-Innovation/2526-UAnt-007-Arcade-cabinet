@@ -12,17 +12,17 @@ except Exception:  # pragma: no cover
 
 class UploadStorage:
     def __init__(self):
-        self.backend = (config.uploads_backend or "").lower()
-        self.remote_root = (config.uploads_remote_root or "").rstrip("/")
+        self.backend = (config.uploads_backend or '').lower()
+        self.remote_root = (config.uploads_remote_root or '').rstrip('/')
         self._s3fs = None
 
     def _s3(self):
-        if self.backend != "s3":
-            raise RuntimeError("Only S3 backend is supported. Set UPLOADS_BACKEND=s3.")
+        if self.backend != 's3':
+            raise RuntimeError('Only S3 backend is supported. Set UPLOADS_BACKEND=s3.')
         if s3fs is None:
-            raise RuntimeError("s3fs is not installed")
-        if not self.remote_root.startswith("s3://"):
-            raise RuntimeError("UPLOADS_REMOTE_ROOT must be an s3:// URI")
+            raise RuntimeError('s3fs is not installed')
+        if not self.remote_root.startswith('s3://'):
+            raise RuntimeError('UPLOADS_REMOTE_ROOT must be an s3:// URI')
         if self._s3fs is not None:
             return self._s3fs
 
@@ -33,36 +33,36 @@ class UploadStorage:
 
         client_kwargs = {}
         if endpoint_url:
-            client_kwargs["endpoint_url"] = endpoint_url
+            client_kwargs['endpoint_url'] = endpoint_url
 
         self._s3fs = s3fs.S3FileSystem(
             key=key,
             secret=secret,
             token=token,
             client_kwargs=client_kwargs,
-            default_fill_cache=False,
+            default_fill_cache=True,
             anon=False,
         )
         return self._s3fs
 
     def _remote_uri(self, *parts: str) -> str:
-        clean_parts = [p.strip("/") for p in parts if p]
+        clean_parts = [p.strip('/') for p in parts if p]
         if not clean_parts:
             return self.remote_root
-        return f"{self.remote_root}/" + "/".join(clean_parts)
+        return f'{self.remote_root}/' + '/'.join(clean_parts)
 
     def uploaded_zip_uri(self, filename: str) -> str:
-        return self._remote_uri("uploaded_zips", filename)
+        return self._remote_uri('uploaded_zips', filename)
 
     def extracted_root_uri(self, filename: str) -> str:
-        return self._remote_uri("extracted_games", filename)
+        return self._remote_uri('extracted_games', filename)
 
     def original_asset_uri(self, zip_filename: str, relative_path: str) -> str:
-        return self._remote_uri("extracted_games", zip_filename, relative_path)
+        return self._remote_uri('extracted_games', zip_filename, relative_path)
 
     def save_uploaded_zip_from_fileobj(self, filename: str, input_file: BinaryIO) -> str:
         remote_uri = self.uploaded_zip_uri(filename)
-        with self._s3().open(remote_uri, "wb") as out:
+        with self._s3().open(remote_uri, 'wb') as out:
             while True:
                 chunk = input_file.read(1024 * 1024)
                 if not chunk:
@@ -71,8 +71,8 @@ class UploadStorage:
         return remote_uri
 
     def save_asset_override(self, game_id: str, safe_filename: str, input_file: BinaryIO) -> str:
-        remote_uri = self._remote_uri("asset_overrides", game_id, safe_filename)
-        with self._s3().open(remote_uri, "wb") as out:
+        remote_uri = self._remote_uri('asset_overrides', game_id, safe_filename)
+        with self._s3().open(remote_uri, 'wb') as out:
             while True:
                 chunk = input_file.read(1024 * 1024)
                 if not chunk:
@@ -84,12 +84,12 @@ class UploadStorage:
         return self._s3().exists(path)
 
     def open_binary(self, path: str):
-        return self._s3().open(path, "rb")
+        return self._s3().open(path, 'rb')
 
     def path_is_file(self, path: str) -> bool:
         try:
             info = self._s3().info(path)
-            return info.get("type") == "file"
+            return info.get('type') == 'file'
         except FileNotFoundError:
             return False
 
