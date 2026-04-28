@@ -55,20 +55,33 @@
           enable = true;
           package = pkgs.sway;
           extraOptions = [ "--unsupported-gpu" ];
+          extraPackages = with pkgs; [ swaybg ]; # Required for background support
         };
 
         # Custom Sway configuration for Kiosk mode
         environment.etc."sway/config".text = lib.mkForce ''
+          # Basic configuration
+          set $mod Mod4
+          font pango:monospace 8
+          
+          # Input configuration (Belgian layout)
+          input "type:keyboard" {
+            xkb_layout be
+          }
+
           # Disable window decorations
           default_border none
           default_floating_border none
-          font pango:monospace 8
           
           # Autohide cursor after 5 seconds
           seat * hide_cursor 5000
           
           # Background
           output * bg #000000 solid
+          
+          # Force all windows to fullscreen (Kiosk mode)
+          for_window [class=".*"] fullscreen enable
+          for_window [title=".*"] fullscreen enable
           
           # Start the kiosk session
           exec ${pkgs.writeShellScript "kiosk-session" ''
