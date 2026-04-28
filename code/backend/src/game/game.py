@@ -9,6 +9,7 @@ import traceback
 from uuid import UUID
 from sqlalchemy.orm import Session
 from storage.uploads_storage import uploads_storage
+from app.auth import get_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def _normalize_virtual_path(p: str) -> str:
         return ''
     return p
 
-@router.get('/')
+@router.get('/', dependencies=[Depends(get_api_key)])
 def get_all_games(db: Session = Depends(database.get_session)):
     return {'games': db.query(database.Game).all()}
 
@@ -43,7 +44,7 @@ class GameCreateRequest(BaseModel):
     name: str
     description: str | None = None
 
-@router.post('/')
+@router.post('/', dependencies=[Depends(get_api_key)])
 def create_game(request: GameCreateRequest, db: Session = Depends(database.get_session)):
     new_game = database.Game(name=request.name, description=request.description)
     db.add(new_game)
@@ -55,7 +56,7 @@ class GamePutRequest(BaseModel):
     name: str
     description: str | None = None
 
-@router.put('/{game_id}')
+@router.put('/{game_id}', dependencies=[Depends(get_api_key)])
 def update_game(game_id: UUID, request: GamePutRequest, db: Session = Depends(database.get_session)):
     game = db.get(database.Game, game_id)
     if not game:
@@ -65,7 +66,7 @@ def update_game(game_id: UUID, request: GamePutRequest, db: Session = Depends(da
     db.commit()
     return {'game': {'id': game.id, 'name': game.name, 'description': game.description}}
 
-@router.delete('/{game_id}')
+@router.delete('/{game_id}', dependencies=[Depends(get_api_key)])
 def delete_game(game_id: UUID, db: Session = Depends(database.get_session)):
     game = db.get(database.Game, game_id)
     if not game:
@@ -155,7 +156,7 @@ def _resolve_candidate_path(extracted_dir: str, game_root_dir: str, normalized_f
     candidate = base_prefix + normalized_file_path
     return base_prefix, candidate
 
-@router.post('/{game_id}/upload-asset')
+@router.post('/{game_id}/upload-asset', dependencies=[Depends(get_api_key)])
 def upload_asset(
     game_id: UUID,
     original_path: str = Form(...),
@@ -197,7 +198,7 @@ def upload_asset(
     return {'message': f'Asset {normalized_original_path} uploaded successfully', 'asset_id': asset.id}
 
 
-@router.delete('/{game_id}/asset-override')
+@router.delete('/{game_id}/asset-override', dependencies=[Depends(get_api_key)])
 def delete_asset_override(
     game_id: UUID,
     original_path: str = Query(...),
@@ -223,7 +224,7 @@ def delete_asset_override(
     return {'message': f'Asset override for {normalized_original_path} deleted successfully'}
 
 
-@router.get('/{game_id}/analyzed-assets')
+@router.get('/{game_id}/analyzed-assets', dependencies=[Depends(get_api_key)])
 def get_analyzed_assets(game_id: UUID, db: Session = Depends(database.get_session)):
     game = db.get(database.Game, game_id)
     if not game:
@@ -254,7 +255,7 @@ def get_analyzed_assets(game_id: UUID, db: Session = Depends(database.get_sessio
     return {'media_files': media_files}
 
 
-@router.get('/{game_id}/asset-overrides')
+@router.get('/{game_id}/asset-overrides', dependencies=[Depends(get_api_key)])
 def get_asset_overrides(game_id: UUID, db: Session = Depends(database.get_session)):
     game = db.get(database.Game, game_id)
     if not game:
