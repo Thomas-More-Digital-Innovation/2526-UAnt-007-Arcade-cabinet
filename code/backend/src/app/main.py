@@ -67,7 +67,7 @@ async def get_api_key(
         detail="Could not validate credentials",
     )
 
-app = FastAPI(dependencies=[Depends(get_api_key)])
+app = FastAPI()
 
 origins = [
     "http://localhost:9000",
@@ -83,12 +83,15 @@ app.add_middleware(
 )
 
 
+# Publicly accessible endpoints (No API key required)
 app.include_router(game_router, prefix="/games", tags=["games"])
-# app.include_router(assets_router, prefix="/assets", tags=["assets"])
 
-app.include_router(analyze_uploads_router)
-app.include_router(file_uploads_router, prefix="/file-uploads", tags=["assets"])
-app.include_router(trigger_build_router, prefix="/trigger-build", tags=["trigger-build"])
+# Protected endpoints (API key required)
+protected_dependency = [Depends(get_api_key)]
+
+app.include_router(analyze_uploads_router, dependencies=protected_dependency)
+app.include_router(file_uploads_router, prefix="/file-uploads", tags=["assets"], dependencies=protected_dependency)
+app.include_router(trigger_build_router, prefix="/trigger-build", tags=["trigger-build"], dependencies=protected_dependency)
 
 @app.get("/")
 async def root():   
