@@ -76,9 +76,6 @@
           # Autohide cursor after 5 seconds
           seat * hide_cursor 5000
           
-          # Background
-          output * bg #000000 solid
-          
           # Force all windows to fullscreen (Kiosk mode)
           for_window [class=".*"] fullscreen enable
           for_window [title=".*"] fullscreen enable
