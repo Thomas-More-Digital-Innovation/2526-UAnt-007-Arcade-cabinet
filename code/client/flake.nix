@@ -49,17 +49,33 @@
         # Docker is enabled, but we manage the container manually in the kiosk service
         virtualisation.docker.enable = true;
 
-        # Consolidated Kiosk Service: Manages Docker container and starts Chromium via Cage (Wayland)
-        services.cage = {
+        # Consolidated Kiosk Service: Manages Docker container and starts Chromium via Sway (Wayland)
+        # We use Sway instead of Cage because Sway supports native cursor autohiding.
+        services.sway = {
           enable = true;
-          user = "pi";
-          program = "${pkgs.writeShellScript "kiosk-session" ''
-            # 1. Wait up to 30 seconds for an internet connection and pull image
+          package = pkgs.sway;
+          extraOptions = [ "--unsupported-gpu" ];
+        };
+
+        # Custom Sway configuration for Kiosk mode
+        environment.etc."sway/config".text = lib.mkForce ''
+          # Disable window decorations
+          default_border none
+          default_floating_border none
+          font pango:monospace 8
+          
+          # Autohide cursor after 5 seconds
+          seat * hide_cursor 5000
+          
+          # Background
+          output * bg #000000 solid
+          
+          # Start the kiosk session
+          exec ${pkgs.writeShellScript "kiosk-session" ''
+            # 1. Wait for internet and pull image
             PULLED=false
-            echo "Waiting for internet connection (up to 30s)..."
             for i in {1..30}; do
               if ${pkgs.iputils}/bin/ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then
-                echo "Internet detected, checking for image updates..."
                 if ${pkgs.docker}/bin/docker pull ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest; then
                   PULLED=true
                 fi
@@ -68,30 +84,23 @@
               ${pkgs.coreutils}/bin/sleep 1
             done
 
-            # 2. Manage the Docker container
-            # Restart the container if we pulled a new image or if it's not running
+            # 2. Manage Docker
             CONTAINER_RUNNING=$(${pkgs.docker}/bin/docker ps -q -f name=arcade-static)
             if [ "$PULLED" = "true" ] || [ -z "$CONTAINER_RUNNING" ]; then
-              echo "Starting/Restarting Docker container..."
               ${pkgs.docker}/bin/docker stop arcade-static || true
               ${pkgs.docker}/bin/docker rm arcade-static || true
-              ${pkgs.docker}/bin/docker run -d \
-                --name arcade-static \
-                -p 80:80 \
-                ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest
+              ${pkgs.docker}/bin/docker run -d --name arcade-static -p 80:80 ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest
             fi
 
-            # 3. Wait for the web server to be responsive
-            echo "Waiting for web server to be responsive..."
+            # 3. Wait for web server
             while ! ${pkgs.curl}/bin/curl -s -o /dev/null -f http://localhost; do
               ${pkgs.coreutils}/bin/sleep 2
             done
 
-            # 4. Clear any stale Chromium locks
+            # 4. Clear locks
             rm -f /home/pi/.config/chromium/SingletonLock
 
-            # 5. Launch Chromium in Kiosk mode via Wayland
-            echo "Launching Chromium with GPU acceleration..."
+            # 5. Launch Chromium
             exec ${pkgs.ungoogled-chromium}/bin/chromium \
               --ozone-platform=wayland \
               --ignore-gpu-blocklist \
@@ -109,46 +118,23 @@
               --disk-cache-size=1 \
               --media-cache-size=1 \
               --app="http://localhost"
-          ''}";
-        };
+          ''}
+        '';
 
-        systemd.services."cage-tty1" = {
-          after = [ "network-online.target" "docker.service" ];
-          wants = [ "network-online.target" "docker.service" ];
-          serviceConfig = {
-            Environment = [
-              "WLR_LIBINPUT_NO_DEVICES=1"
-            ];
-            ExecStopPost = "${pkgs.docker}/bin/docker stop arcade-static || true";
-            Restart = "always";
-            RestartSec = 10;
-          };
-        };
+        # Auto-login the 'pi' user on TTY1 to start Sway
+        services.getty.autologinUser = "pi";
 
-        # Allow the 'pi' user to manage the cage service without a password
-        security.sudo.extraRules = [
-          {
-            users = [ "pi" ];
-            commands = [
-              {
-                command = "${pkgs.systemd}/bin/systemctl start cage-tty1";
-                options = [ "NOPASSWD" ];
-              }
-              {
-                command = "${pkgs.systemd}/bin/systemctl stop cage-tty1";
-                options = [ "NOPASSWD" ];
-              }
-              {
-                command = "${pkgs.systemd}/bin/systemctl restart cage-tty1";
-                options = [ "NOPASSWD" ];
-              }
-            ];
-          }
-        ];
+        # Start Sway on login
+        programs.bash.loginShellInit = ''
+          if [ "$(tty)" = "/dev/tty1" ]; then
+            exec sway
+          fi
+        '';
 
-        # Ensure the user 'pi' can interact with docker
-        users.users.pi.extraGroups = [ "docker" ];
+        # Ensure the 'pi' user can manage docker and has GPU access
+        users.users.pi.extraGroups = [ "docker" "video" "render" "input" ];
       };
+
 
       immutable = { config, lib, pkgs, ... }: {
         fileSystems."/" = lib.mkForce {
