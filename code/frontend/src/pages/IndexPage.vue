@@ -561,7 +561,6 @@ async function updatePi() {
     stopPolling();
     await pollWorkflowStatus();
 
-    notificationStore.notify({ type: 'positive', message: 'Pi update triggered.' });
   } catch (err) {
     console.error(err);
     notificationStore.notify({ type: 'negative', message: 'Failed to trigger update.' });
