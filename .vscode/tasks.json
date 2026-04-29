@@ -1,30 +1,72 @@
 {
-	       "version": "2.0.0",
-	       "tasks": [
-		       {
-			       "label": "Start Backend (venv)",
-			       "type": "shell",
-			       "command": "cd ./code/backend/ && source .venv/bin/activate && uvicorn src.app.main:app --reload",
-			       "args": [],
-			       "isBackground": true,
-			       "problemMatcher": [],
-			       "group": "build"
-		       },
-		       {
-			       "label": "Start Frontend (pnpm)",
-			       "type": "shell",
-			       "command": "cd ./code/frontend/ && npm run dev",
-			       "isBackground": true,
-			       "problemMatcher": [],
-			       "group": "build"
-		       },
-		       {
-			       "label": "dev",
-			       "dependsOn": [
-				       "Start Backend (venv)",
-				       "Start Frontend (pnpm)"
-			       ],
-			       "problemMatcher": []
-		       }
-	       ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Backend (venv)",
+			"type": "shell",
+			"command": "cd ./code/backend/ && source .venv/bin/activate && uvicorn src.app.main:app --reload",
+			"args": [],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Start Frontend (pnpm)",
+			"type": "shell",
+			"command": "cd ./code/frontend/ && npm run dev",
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Lint Backend",
+			"type": "shell",
+			"command": "cd ./code/backend/ && source .venv/bin/activate && flake8 src && pyright src && mypy src",
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Lint Frontend",
+			"type": "shell",
+			"command": "cd ./code/frontend/ && npm run lint",
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Test Backend",
+			"type": "shell",
+			"command": "cd ./code/backend/ && source .venv/bin/activate && pytest",
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Test Frontend",
+			"type": "shell",
+			"command": "cd ./code/frontend/ && npm test",
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "dev",
+			"dependsOn": [
+				"Start Backend (venv)",
+				"Start Frontend (pnpm)"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Lint and Test All",
+			"dependsOn": [
+				"Lint Backend",
+				"Lint Frontend",
+				"Test Backend",
+				"Test Frontend"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		}
+	]
 }
