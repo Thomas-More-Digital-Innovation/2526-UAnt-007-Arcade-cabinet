@@ -181,7 +181,7 @@ async def get_workflow_status():
         jobs = None
         try:
             if hasattr(latest_run, 'get_jobs'):
-                jobs = latest_run.get_jobs()
+                jobs = latest_run.get_jobs()  # type: ignore
             elif hasattr(latest_run, 'jobs'):
                 jobs = latest_run.jobs()
             else:

@@ -113,7 +113,7 @@ class UploadStorage:
                 chunk = input_file.read(1024 * 1024)
                 if not chunk:
                     break
-                out.write(chunk)
+                out.write(chunk)  # type: ignore[reportArgumentType]
         return remote_uri
 
     def save_asset_override(
@@ -134,7 +134,7 @@ class UploadStorage:
                 chunk = input_file.read(1024 * 1024)
                 if not chunk:
                     break
-                out.write(chunk)
+                out.write(chunk)  # type: ignore[reportArgumentType]
         return remote_uri
 
     def exists_path(self, path: str) -> bool:
