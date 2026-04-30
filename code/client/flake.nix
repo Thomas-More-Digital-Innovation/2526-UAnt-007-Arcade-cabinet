@@ -186,7 +186,7 @@
         imports = [ inputs.impermanence.nixosModules.impermanence ];
         environment.persistence."/mnt-root/persist" = {
           hideMounts = true;
-          directories = [ "/var/log" "/var/lib/nixos" "/var/lib/systemd/coredump" ];
+          directories = [ "/var/log" "/var/lib/nixos" "/var/lib/systemd/coredump" "/var/lib/docker" ];
           files = [
             "/etc/machine-id"
             "/etc/ssh/ssh_host_ed25519_key"
