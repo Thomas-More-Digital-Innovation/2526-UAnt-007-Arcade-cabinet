@@ -103,6 +103,9 @@
               ${pkgs.docker}/bin/docker stop arcade-static || true
               ${pkgs.docker}/bin/docker rm arcade-static || true
               ${pkgs.docker}/bin/docker run -d --name arcade-static -p 80:80 ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest
+              
+              # Clean up old/dangling images to prevent storage from filling up
+              ${pkgs.docker}/bin/docker image prune -f
             fi
 
             # 3. Wait for web server
