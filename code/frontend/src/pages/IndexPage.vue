@@ -22,7 +22,8 @@
     <!-- Game cards -->
     <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
       <game-card v-for="game in data" :key="game.id" :title="game.name" :modal="modalGame" :id="game.id"
-        @edit="onEditGame(game)" @delete="deleteGame(game)" />
+        :is-active="game.is_active" @edit="onEditGame(game)" @delete="deleteGame(game)"
+        @update:active="toggleActive(game, $event)" />
     </div>
 
     <!-- Add/Edit game dialog -->
@@ -206,6 +207,7 @@ interface Game {
   id: string;
   name: string;
   description?: string;
+  is_active: boolean;
 }
 
 interface AnalyzedAsset {
@@ -220,7 +222,12 @@ const isLoading = ref(true);
 const data = reactive<Game[]>([]);
 const confirm = ref(false);
 const isEditMode = ref(false);
-const modalGame = reactive<{ id: string | undefined; name: string; description: string }>({ id: undefined, name: '', description: '' });
+const modalGame = reactive<{ id: string | undefined; name: string; description: string; is_active: boolean }>({
+  id: undefined,
+  name: '',
+  description: '',
+  is_active: true,
+});
 const analyzedAssets = ref<AnalyzedAsset[]>([]);
 const loadingAnalyzedAssets = ref(false);
 const replacementPaths = ref<Set<string>>(new Set());
@@ -314,6 +321,7 @@ function resetModal() {
   modalGame.id = undefined;
   modalGame.name = '';
   modalGame.description = '';
+  modalGame.is_active = true;
   analyzedAssets.value = [];
   loadingAnalyzedAssets.value = false;
   replacementPaths.value = new Set();
@@ -334,7 +342,11 @@ async function addGame() {
   isAddingGame.value = true;
   try {
     // Step 1: Create the game
-    const gameResp = await api.post('/games', { name: modalGame.name, description: modalGame.description });
+    const gameResp = await api.post('/games', {
+      name: modalGame.name,
+      description: modalGame.description,
+      is_active: modalGame.is_active
+    });
     const newGame = gameResp.data.game;
     // Step 2: Upload the ZIP file
     const formData = new FormData();
@@ -357,6 +369,7 @@ async function onEditGame(game: Game) {
   modalGame.id = game.id;
   modalGame.name = game.name;
   modalGame.description = game.description || '';
+  modalGame.is_active = game.is_active;
   isEditMode.value = true;
   confirm.value = true;
   Object.keys(assetResolutions).forEach(k => delete assetResolutions[k]);
@@ -442,7 +455,6 @@ function deleteReplacementAsset(asset: AnalyzedAsset) {
 async function updateGame() {
   try {
     const response = await api.put(`/games/${modalGame.id}`, {
-      id: modalGame.id,
       name: modalGame.name,
       description: modalGame.description,
     });
@@ -454,6 +466,25 @@ async function updateGame() {
   } catch (err) {
     // handle or log error
     console.error(err);
+  }
+}
+
+async function toggleActive(game: Game, active: boolean) {
+  try {
+    await api.put(`/games/${game.id}`, {
+      id: game.id,
+      name: game.name,
+      description: game.description,
+      is_active: active,
+    });
+    game.is_active = active;
+    notificationStore.notify({
+      type: 'positive',
+      message: `Game ${game.name} is now ${active ? 'active' : 'inactive'}.`,
+    });
+  } catch (err) {
+    console.error(err);
+    notificationStore.notify({ type: 'negative', message: 'Failed to update active status.' });
   }
 }
 

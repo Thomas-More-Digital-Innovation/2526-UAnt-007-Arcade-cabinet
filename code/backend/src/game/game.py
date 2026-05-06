@@ -47,6 +47,7 @@ class GameCreateRequest(BaseModel):
     """Pydantic model for game creation."""
     name: str
     description: str | None = None
+    is_active: bool = True
 
 
 @router.post('/', dependencies=[Depends(get_api_key)])
@@ -57,7 +58,8 @@ def create_game(
     """Create a new game record."""
     new_game = database.Game(
         name=request.name,
-        description=request.description
+        description=request.description,
+        is_active=request.is_active
     )
     db.add(new_game)
     db.commit()
@@ -65,7 +67,8 @@ def create_game(
         'game': {
             'id': new_game.id,
             'name': new_game.name,
-            'description': new_game.description
+            'description': new_game.description,
+            'is_active': new_game.is_active
         }
     }
 
@@ -75,6 +78,7 @@ class GamePutRequest(BaseModel):
     id: UUID  # noqa: A003
     name: str
     description: str | None = None
+    is_active: bool | None = None
 
 
 @router.put('/{game_id}', dependencies=[Depends(get_api_key)])
@@ -89,12 +93,15 @@ def update_game(
         raise HTTPException(status_code=404, detail='Game not found')
     game.name = request.name
     game.description = request.description
+    if request.is_active is not None:
+        game.is_active = request.is_active
     db.commit()
     return {
         'game': {
             'id': game.id,
             'name': game.name,
-            'description': game.description
+            'description': game.description,
+            'is_active': game.is_active
         }
     }
 
