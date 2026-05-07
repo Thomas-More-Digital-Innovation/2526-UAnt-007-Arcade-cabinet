@@ -118,7 +118,12 @@ async def trigger_workflow(
             detail='GitHub App configuration is missing'
         )
 
-    games = db.query(database.Game).filter(database.Game.is_active).all()
+    games = (
+        db.query(database.Game)
+        .filter(database.Game.is_active)
+        .order_by(database.Game.id.desc())
+        .all()
+    )
     zip_uploads = db.query(database.ZipUpload).all()
     assets = db.query(database.Asset).all()
 

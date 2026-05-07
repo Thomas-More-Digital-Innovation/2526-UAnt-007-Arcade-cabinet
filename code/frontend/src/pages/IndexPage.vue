@@ -21,7 +21,7 @@
 
     <!-- Game cards -->
     <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-      <game-card v-for="game in data" :key="game.id" :title="game.name" :modal="modalGame" :id="game.id"
+      <game-card v-for="game in sortedGames" :key="game.id" :title="game.name" :modal="modalGame" :id="game.id"
         :is-active="game.is_active" @edit="onEditGame(game)" @delete="deleteGame(game)"
         @update:active="toggleActive(game, $event)" />
     </div>
@@ -195,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onUnmounted } from 'vue';
+import { ref, reactive, onUnmounted, computed } from 'vue';
 import { useQuasar } from 'quasar';
 import GameCard from '../components/GameCard.vue';
 import { api } from 'boot/axios';
@@ -233,6 +233,9 @@ const loadingAnalyzedAssets = ref(false);
 const replacementPaths = ref<Set<string>>(new Set());
 const replacementFiles = reactive<Record<string, File | null>>({});
 const uploadingAssetPath = ref<string | null>(null);
+const sortedGames = computed(() => {
+  return [...data].sort((a, b) => b.id.localeCompare(a.id));
+});
 const uploaderRef = ref();
 const isAddingGame = ref(false);
 const apiKey = import.meta.env.VITE_API_KEY;
@@ -455,8 +458,10 @@ function deleteReplacementAsset(asset: AnalyzedAsset) {
 async function updateGame() {
   try {
     const response = await api.put(`/games/${modalGame.id}`, {
+      id: modalGame.id,
       name: modalGame.name,
       description: modalGame.description,
+      is_active: modalGame.is_active,
     });
 
     const updatedGame = response.data.game;

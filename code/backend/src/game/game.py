@@ -40,7 +40,13 @@ def _normalize_virtual_path(p: str) -> str:
 @router.get('/', dependencies=[Depends(get_api_key)])
 def get_all_games(db: Session = Depends(database.get_session)):  # noqa: B008
     """Retrieve all games from the database."""
-    return {'games': db.query(database.Game).all()}
+    return {
+        'games': (
+            db.query(database.Game)
+            .order_by(database.Game.id.desc())
+            .all()
+        )
+    }
 
 
 class GameCreateRequest(BaseModel):
@@ -75,7 +81,7 @@ def create_game(
 
 class GamePutRequest(BaseModel):
     """Pydantic model for updating a game."""
-    id: UUID  # noqa: A003
+    id: UUID | None = None  # noqa: A003
     name: str
     description: str | None = None
     is_active: bool | None = None
