@@ -2,7 +2,10 @@
   <q-card>
     <q-card-section class="flex items-center justify-between">
       <div class="text-h6">{{ title }}</div>
-      <q-btn color="primary" icon="science" label="Test" unelevated @click="openGame" />
+      <div class="flex items-center gap-4">
+        <q-checkbox :model-value="isActive" label="Active" @update:model-value="$emit('update:active', $event)" />
+        <q-btn color="primary" icon="science" label="Test" unelevated @click="openGame" />
+      </div>
     </q-card-section>
     <q-card-section class="flex gap-2 justify-end">
       <q-btn color="primary" icon="edit" unelevated :ripple="false" label="Edit" @click="onEdit" />
@@ -67,8 +70,9 @@ const props = defineProps<{
   title: string;
   id: string;
   modal: { name: string };
+  isActive: boolean;
 }>();
-const emit = defineEmits(['edit', 'update:modal', 'delete']);
+const emit = defineEmits(['edit', 'update:modal', 'delete', 'update:active']);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const gameOpen = ref(false);

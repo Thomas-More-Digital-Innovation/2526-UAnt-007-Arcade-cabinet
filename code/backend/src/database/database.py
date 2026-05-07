@@ -54,6 +54,7 @@ class Game(Base):  # noqa: PLR903
     description: Mapped[Optional[str]] = mapped_column(
         String(2000), nullable=True
     )
+    is_active: Mapped[bool] = mapped_column(default=True)
     zip_uploads: Mapped[list['ZipUpload']] = relationship(
         back_populates='game'
     )

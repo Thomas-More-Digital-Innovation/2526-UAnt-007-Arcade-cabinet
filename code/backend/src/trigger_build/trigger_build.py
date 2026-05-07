@@ -55,6 +55,7 @@ def serialize_game(game):
         'id': str(game.id),
         'name': game.name,
         'description': game.description,
+        'is_active': game.is_active,
         'zip_uploads': [
             {
                 'id': str(zu.id),
@@ -117,7 +118,7 @@ async def trigger_workflow(
             detail='GitHub App configuration is missing'
         )
 
-    games = db.query(database.Game).all()
+    games = db.query(database.Game).filter(database.Game.is_active).all()
     zip_uploads = db.query(database.ZipUpload).all()
     assets = db.query(database.Asset).all()
 
