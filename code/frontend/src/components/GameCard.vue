@@ -1,5 +1,5 @@
 <template>
-  <q-card class="game-card flex flex-col">
+  <q-card>
     <q-card-section class="flex items-center justify-between">
       <div class="text-h6">{{ title }}</div>
       <div class="flex items-center gap-4">
@@ -7,11 +7,6 @@
         <q-btn color="primary" icon="science" label="Test" unelevated @click="openGame" />
       </div>
     </q-card-section>
-
-    <q-card-section v-if="description" class="grow">
-      <div class="text-body2 description-text">{{ description }}</div>
-    </q-card-section>
-
     <q-card-section class="flex gap-2 justify-end">
       <q-btn color="primary" icon="edit" unelevated :ripple="false" label="Edit" @click="onEdit" />
       <q-btn
@@ -74,8 +69,7 @@ import { api } from 'boot/axios';
 const props = defineProps<{
   title: string;
   id: string;
-  description?: string | undefined;
-  modal: { id: string | undefined; name: string; description: string; is_active: boolean };
+  modal: { name: string };
   isActive: boolean;
 }>();
 const emit = defineEmits(['edit', 'update:modal', 'delete', 'update:active']);
@@ -146,16 +140,6 @@ function onRemove() {
 </script>
 
 <style scoped>
-.game-card {
-  min-height: 200px;
-}
-
-.description-text {
-  white-space: pre-wrap;
-  color: #666;
-  font-style: italic;
-}
-
 .game-fullscreen-container {
   position: relative;
   width: 100vw;
@@ -202,4 +186,3 @@ function onRemove() {
   border: none;
 }
 </style>
-
