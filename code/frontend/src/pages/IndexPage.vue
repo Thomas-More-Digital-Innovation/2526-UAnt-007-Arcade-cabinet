@@ -21,8 +21,8 @@
 
     <!-- Game cards -->
     <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-      <game-card v-for="game in data" :key="game.id" :title="game.name" :modal="modalGame" :id="game.id"
-        :is-active="game.is_active" @edit="onEditGame(game)" @delete="deleteGame(game)"
+      <game-card v-for="game in data" :key="game.id" :title="game.name" :description="game.description" :modal="modalGame"
+        :id="game.id" :is-active="game.is_active" @edit="onEditGame(game)" @delete="deleteGame(game)"
         @update:active="toggleActive(game, $event)" />
     </div>
 
