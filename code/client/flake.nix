@@ -34,10 +34,12 @@
       inputs.nixos-unstable.follows = "nixpkgs";
     };
 
+    impermanence.url = "github:nix-community/impermanence";
+
     flake-compat.url = "github:edolstra/flake-compat";
   };
 
-  outputs = { self, nixpkgs, nixos-raspberrypi, argononed, nixos-images, ... }@inputs: let
+  outputs = { self, nixpkgs, nixos-raspberrypi, argononed, nixos-images, impermanence, ... }@inputs: let
     allSystems = nixpkgs.lib.systems.flakeExposed;
     forSystems = systems: f: nixpkgs.lib.genAttrs systems (system: f system);
   in {
@@ -186,7 +188,14 @@
         imports = [ inputs.impermanence.nixosModules.impermanence ];
         environment.persistence."/mnt-root/persist" = {
           hideMounts = true;
-          directories = [ "/var/log" "/var/lib/nixos" "/var/lib/systemd/coredump" "/var/lib/docker" ];
+          directories = [
+            "/var/log"
+            "/var/lib/nixos"
+            "/var/lib/systemd/coredump"
+            "/var/lib/docker"
+            "/var/lib/NetworkManager"
+            "/var/lib/bluetooth"
+          ];
           files = [
             "/etc/machine-id"
             "/etc/ssh/ssh_host_ed25519_key"
@@ -194,6 +203,13 @@
             "/etc/ssh/ssh_host_rsa_key"
             "/etc/ssh/ssh_host_rsa_key.pub"
           ];
+          users.pi = {
+            directories = [
+              ".config/chromium"
+              ".cache/chromium"
+              "Downloads"
+            ];
+          };
         };
       };
     };
