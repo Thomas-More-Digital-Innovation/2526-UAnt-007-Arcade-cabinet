@@ -43,6 +43,15 @@ function showHomeScreen() {
         });
         
         gameOption.appendChild(link);
+
+        // Add description to menu item
+        if (game.description) {
+            const desc = document.createElement('div');
+            desc.className = 'menu-description';
+            desc.textContent = game.description;
+            gameOption.appendChild(desc);
+        }
+
         homeScreenMenu.appendChild(gameOption);
     });
 
