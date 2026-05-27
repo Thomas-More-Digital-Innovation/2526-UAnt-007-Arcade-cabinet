@@ -34,7 +34,4 @@ github_repo_name = os.getenv('GITHUB_REPO_NAME', '')
 api_key = os.getenv('API_KEY', '')
 
 cors_env = os.getenv('CORS_ALLOWED_ORIGINS', '[]')
-try:
-    cors = json.loads(cors_env)
-except json.JSONDecodeError:
-    cors = [origin.strip() for origin in cors_env.split(',') if origin.strip()]
+cors = json.loads(cors_env)
