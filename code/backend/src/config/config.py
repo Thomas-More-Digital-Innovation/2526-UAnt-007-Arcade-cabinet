@@ -1,6 +1,7 @@
 """
 Configuration module for the application.
 """
+import json
 import os
 
 uploads_directory = os.path.join(
@@ -31,3 +32,9 @@ github_installation_id = os.getenv('GITHUB_INSTALLATION_ID', '')
 github_repo_owner = os.getenv('GITHUB_REPO_OWNER', '')
 github_repo_name = os.getenv('GITHUB_REPO_NAME', '')
 api_key = os.getenv('API_KEY', '')
+
+cors_env = os.getenv('CORS_ALLOWED_ORIGINS', '[]')
+try:
+    cors = json.loads(cors_env)
+except json.JSONDecodeError:
+    cors = [origin.strip() for origin in cors_env.split(',') if origin.strip()]
