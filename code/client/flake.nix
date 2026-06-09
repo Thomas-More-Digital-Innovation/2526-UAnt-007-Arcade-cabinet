@@ -34,10 +34,12 @@
       inputs.nixos-unstable.follows = "nixpkgs";
     };
 
+    impermanence.url = "github:nix-community/impermanence";
+
     flake-compat.url = "github:edolstra/flake-compat";
   };
 
-  outputs = { self, nixpkgs, nixos-raspberrypi, argononed, nixos-images, ... }@inputs: let
+  outputs = { self, nixpkgs, nixos-raspberrypi, argononed, nixos-images, impermanence, ... }@inputs: let
     allSystems = nixpkgs.lib.systems.flakeExposed;
     forSystems = systems: f: nixpkgs.lib.genAttrs systems (system: f system);
   in {
@@ -49,60 +51,80 @@
         # Docker is enabled, but we manage the container manually in the kiosk service
         virtualisation.docker.enable = true;
 
-        # Consolidated Kiosk Service: Manages Docker container and starts Chromium
-        systemd.services.kiosk = {
-          description = "Arcade Kiosk (Docker & Browser)";
-          after = [ "network-online.target" "docker.service" "display-manager.service" ];
-          wants = [ "network-online.target" "docker.service" ];
-          serviceConfig = {
-            Type = "simple";
-            User = "pi";
-            Group = "users";
-            # Chromium needs a DISPLAY and an XAUTHORITY
-            Environment = [
-              "DISPLAY=:0"
-              "XAUTHORITY=/home/pi/.Xauthority"
-            ];
-            ExecStart = pkgs.writeShellScript "kiosk-session" ''
-              # 1. Wait up to 30 seconds for an internet connection and pull image
-              PULLED=false
-              echo "Waiting for internet connection (up to 30s)..."
-              for i in {1..30}; do
-                if ${pkgs.iputils}/bin/ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then
-                  echo "Internet detected, checking for image updates..."
-                  if ${pkgs.docker}/bin/docker pull ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest; then
-                    PULLED=true
-                  fi
-                  break
+        # Consolidated Kiosk Service: Manages Docker container and starts Chromium via Sway (Wayland)
+        # We use Sway instead of Cage because Sway supports native cursor autohiding.
+        programs.sway = {
+          enable = true;
+          package = pkgs.sway;
+          extraOptions = [ "--unsupported-gpu" ];
+          extraPackages = with pkgs; [ swaybg ]; # Required for background support
+        };
+
+        # Custom Sway configuration for Kiosk mode
+        environment.etc."sway/config".text = lib.mkForce ''
+          # Basic configuration
+          set $mod Mod4
+          font pango:monospace 8
+          
+          # Input configuration (Belgian layout)
+          input "type:keyboard" {
+            xkb_layout be
+          }
+
+          # Remap Arcade Tab button to close the focused window
+          bindsym Tab kill
+
+          # Disable window decorations
+          default_border none
+          default_floating_border none
+          
+          # Autohide cursor after 5 seconds
+          seat * hide_cursor 5000
+          
+          # Force all windows to fullscreen (Kiosk mode)
+          for_window [class=".*"] fullscreen enable
+          for_window [title=".*"] fullscreen enable
+          
+          # Start the kiosk session
+          exec ${pkgs.writeShellScript "kiosk-session" ''
+            # 1. Wait for internet and pull image
+            PULLED=false
+            for i in {1..30}; do
+              if ${pkgs.iputils}/bin/ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then
+                if ${pkgs.docker}/bin/docker pull ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest; then
+                  PULLED=true
                 fi
-                ${pkgs.coreutils}/bin/sleep 1
-              done
-
-              # 2. Manage the Docker container
-              # Restart the container if we pulled a new image or if it's not running
-              CONTAINER_RUNNING=$(${pkgs.docker}/bin/docker ps -q -f name=arcade-static)
-              if [ "$PULLED" = "true" ] || [ -z "$CONTAINER_RUNNING" ]; then
-                echo "Starting/Restarting Docker container..."
-                ${pkgs.docker}/bin/docker stop arcade-static || true
-                ${pkgs.docker}/bin/docker rm arcade-static || true
-                ${pkgs.docker}/bin/docker run -d \
-                  --name arcade-static \
-                  -p 80:80 \
-                  ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest
+                break
               fi
+              ${pkgs.coreutils}/bin/sleep 1
+            done
 
-              # 3. Wait for the web server to be responsive
-              echo "Waiting for web server to be responsive..."
-              while ! ${pkgs.curl}/bin/curl -s -o /dev/null -f http://localhost; do
-                ${pkgs.coreutils}/bin/sleep 2
-              done
+            # 2. Manage Docker
+            CONTAINER_RUNNING=$(${pkgs.docker}/bin/docker ps -q -f name=arcade-static)
+            if [ "$PULLED" = "true" ] || [ -z "$CONTAINER_RUNNING" ]; then
+              ${pkgs.docker}/bin/docker stop arcade-static || true
+              ${pkgs.docker}/bin/docker rm arcade-static || true
+              ${pkgs.docker}/bin/docker run -d --name arcade-static -p 80:80 ghcr.io/thomas-more-digital-innovation/arcade-cabinet-static:latest
+              
+              # Clean up old/dangling images to prevent storage from filling up
+              ${pkgs.docker}/bin/docker image prune -f
+            fi
 
-              # 4. Clear any stale Chromium locks
+            # 3. Wait for web server
+            while ! ${pkgs.curl}/bin/curl -s -o /dev/null -f http://localhost; do
+              ${pkgs.coreutils}/bin/sleep 2
+            done
+
+            # 4. Launch Chromium in a loop
+            while true; do
+              # Clear locks
               rm -f /home/pi/.config/chromium/SingletonLock
 
-              # 5. Launch Chromium in Kiosk mode
-              echo "Launching Chromium..."
-              exec ${pkgs.ungoogled-chromium}/bin/chromium \
+              ${pkgs.ungoogled-chromium}/bin/chromium \
+                --ozone-platform=wayland \
+                --ignore-gpu-blocklist \
+                --enable-gpu-rasterization \
+                --enable-zero-copy \
                 --no-first-run \
                 --no-default-browser-check \
                 --kiosk \
@@ -114,53 +136,27 @@
                 --disable-cache \
                 --disk-cache-size=1 \
                 --media-cache-size=1 \
-                "http://localhost"
-            '';
-            ExecStopPost = "${pkgs.docker}/bin/docker stop arcade-static || true";
-            Restart = "always";
-            RestartSec = 10;
-          };
-        };
-
-        # Configure the X session startup
-        # We use mkForce to override the default chromium startup in rpi5 configs
-        services.xserver.displayManager.sessionCommands = lib.mkForce ''
-          ${pkgs.xorg.xset}/bin/xset s off
-          ${pkgs.xorg.xset}/bin/xset -dpms
-          ${pkgs.xorg.xset}/bin/xset s noblank
-
-          # Hide mouse cursor when inactive
-          ${pkgs.unclutter-xfixes}/bin/unclutter --timeout 1 &
-
-          # Trigger the consolidated kiosk service
-          # We use sudo because it's a system service; NOPASSWD rule is added below
-          sudo ${pkgs.systemd}/bin/systemctl restart kiosk &
+                --app="http://localhost"
+              
+              ${pkgs.coreutils}/bin/sleep 1
+            done
+          ''}
         '';
 
-        # Allow the 'pi' user to manage the kiosk service without a password
-        security.sudo.extraRules = [
-          {
-            users = [ "pi" ];
-            commands = [
-              {
-                command = "${pkgs.systemd}/bin/systemctl start kiosk";
-                options = [ "NOPASSWD" ];
-              }
-              {
-                command = "${pkgs.systemd}/bin/systemctl stop kiosk";
-                options = [ "NOPASSWD" ];
-              }
-              {
-                command = "${pkgs.systemd}/bin/systemctl restart kiosk";
-                options = [ "NOPASSWD" ];
-              }
-            ];
-          }
-        ];
+        # Auto-login the 'pi' user on TTY1 to start Sway
+        services.getty.autologinUser = "pi";
 
-        # Ensure the user 'pi' can interact with docker
-        users.users.pi.extraGroups = [ "docker" ];
+        # Start Sway on login
+        programs.bash.loginShellInit = ''
+          if [ "$(tty)" = "/dev/tty1" ]; then
+            exec sway
+          fi
+        '';
+
+        # Ensure the 'pi' user can manage docker and has GPU access
+        users.users.pi.extraGroups = [ "docker" "video" "render" "input" ];
       };
+
 
       immutable = { config, lib, pkgs, ... }: {
         fileSystems."/" = lib.mkForce {
@@ -192,7 +188,14 @@
         imports = [ inputs.impermanence.nixosModules.impermanence ];
         environment.persistence."/mnt-root/persist" = {
           hideMounts = true;
-          directories = [ "/var/log" "/var/lib/nixos" "/var/lib/systemd/coredump" ];
+          directories = [
+            "/var/log"
+            "/var/lib/nixos"
+            "/var/lib/systemd/coredump"
+            "/var/lib/docker"
+            "/var/lib/NetworkManager"
+            "/var/lib/bluetooth"
+          ];
           files = [
             "/etc/machine-id"
             "/etc/ssh/ssh_host_ed25519_key"
@@ -200,6 +203,13 @@
             "/etc/ssh/ssh_host_rsa_key"
             "/etc/ssh/ssh_host_rsa_key.pub"
           ];
+          users.pi = {
+            directories = [
+              ".config/chromium"
+              ".cache/chromium"
+              "Downloads"
+            ];
+          };
         };
       };
     };
@@ -255,14 +265,15 @@
 
         users.users.pi = {
           isNormalUser = true;
-          extraGroups = [ "wheel" "docker" "input" "video" "plugdev" ];
+          extraGroups = [ "wheel" "docker" "input" "video" "render" "plugdev" ];
           hashedPassword = "$6$8HEfeFVwfLMMhpY.$e8ZgUExdBzdyi/zZW2Y10M0XdKAuEZ6anx3TNBJz3SyKDt.p7HuxRFWOf.X4yO/ubZ29I2M.Y0n3MUfgOebNR.";
         };
 
         users.users.root = {
           hashedPassword = "$6$1S4IKvCOc1FqhMig$ohQsKqzkDuES5DBMgYzzBE3OX53miz0T3MHzmIXlvhIrGxM2rAwHq0OEeJfe5FPB973jott3bC7U3u5E6LmOc.";
         };
-
+        hardware.graphics.enable = true;
+ 
         environment.systemPackages = with pkgs; [
           tree
           htop
@@ -271,12 +282,17 @@
           ungoogled-chromium
           dnsutils
           xorg.xset
-          input-remapper
           evtest
           unclutter-xfixes
         ];
 
-        services.input-remapper.enable = true;
+
+
+        services.udev.extraHwdb = ''
+          # Match by name
+          evdev:name:Ultimarc I-PAC 2:*
+            KEYBOARD_KEY_700e0=enter
+        '';
 
         boot.kernelParams = [ "consoleblank=0" ];
 
@@ -346,25 +362,6 @@
               nixos-raspberrypi.nixosModules.sd-image
             ];
 
-            # Enable the X11 windowing system.
-            services.xserver.enable = true;
-
-            # Enable Openbox (extremely lightweight window manager).
-            services.xserver.windowManager.openbox.enable = true;
-            services.xserver.displayManager.lightdm.enable = true;
-
-            # Configure auto-login for the 'pi' user.
-            services.displayManager.autoLogin.enable = true;
-            services.displayManager.autoLogin.user = "pi";
-
-
-            # Disable screensaver and power management in X11
-            services.xserver.serverFlagsSection = ''
-              Option "BlankTime" "0"
-              Option "StandbyTime" "0"
-              Option "SuspendTime" "0"
-              Option "OffTime" "0"
-            '';
           })
           custom-user-config
         ];
@@ -386,25 +383,7 @@
               self.nixosModules.persistence
             ];
 
-            # Enable the X11 windowing system.
-            services.xserver.enable = true;
 
-            # Enable Openbox (extremely lightweight window manager).
-            services.xserver.windowManager.openbox.enable = true;
-            services.xserver.displayManager.lightdm.enable = true;
-
-            # Configure auto-login for the 'pi' user.
-            services.displayManager.autoLogin.enable = true;
-            services.displayManager.autoLogin.user = "pi";
-
-
-            # Disable screensaver and power management in X11
-            services.xserver.serverFlagsSection = ''
-              Option "BlankTime" "0"
-              Option "StandbyTime" "0"
-              Option "SuspendTime" "0"
-              Option "OffTime" "0"
-            '';
           })
           custom-user-config
         ];
@@ -422,25 +401,7 @@
               nixos-raspberrypi.nixosModules.sd-image
             ];
 
-            # Enable the X11 windowing system.
-            services.xserver.enable = true;
 
-            # Enable Openbox (extremely lightweight window manager).
-            services.xserver.windowManager.openbox.enable = true;
-            services.xserver.displayManager.lightdm.enable = true;
-
-            # Configure auto-login for the 'pi' user.
-            services.displayManager.autoLogin.enable = true;
-            services.displayManager.autoLogin.user = "pi";
-
-
-            # Disable screensaver and power management in X11
-            services.xserver.serverFlagsSection = ''
-              Option "BlankTime" "0"
-              Option "StandbyTime" "0"
-              Option "SuspendTime" "0"
-              Option "OffTime" "0"
-            '';
           })
           custom-user-config
         ];
@@ -461,25 +422,7 @@
               self.nixosModules.persistence
             ];
 
-            # Enable the X11 windowing system.
-            services.xserver.enable = true;
 
-            # Enable Openbox (extremely lightweight window manager).
-            services.xserver.windowManager.openbox.enable = true;
-            services.xserver.displayManager.lightdm.enable = true;
-
-            # Configure auto-login for the 'pi' user.
-            services.displayManager.autoLogin.enable = true;
-            services.displayManager.autoLogin.user = "pi";
-
-
-            # Disable screensaver and power management in X11
-            services.xserver.serverFlagsSection = ''
-              Option "BlankTime" "0"
-              Option "StandbyTime" "0"
-              Option "SuspendTime" "0"
-              Option "OffTime" "0"
-            '';
           })
           custom-user-config
         ];

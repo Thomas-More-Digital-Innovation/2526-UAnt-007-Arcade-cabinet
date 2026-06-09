@@ -22,3 +22,11 @@ GENERATE Password for hashedPassword:
 ## Credentials
 - **User**: `pi` | **Password**: `pi`
 - **User**: `root` | **Password**: `nixos`
+
+## Debugging Input
+To watch live key presses from the arcade buttons (Ultimarc I-PAC 2):
+```bash
+sudo evtest
+```
+Select the device number for "Ultimarc I-PAC 2" to see real-time button events. This is useful for verifying hardware connections and remapping keys.
+
